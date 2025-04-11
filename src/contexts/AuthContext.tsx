@@ -26,44 +26,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Mock user data for development purposes
-const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    firstName: "Admin",
-    lastName: "User",
-    email: "admin@university.edu",
-    role: "admin" as UserRole,
-    profileImage: "https://ui-avatars.com/api/?name=Admin+User&background=random",
-  },
-  {
-    id: "2",
-    firstName: "Department",
-    lastName: "Head",
-    email: "head@university.edu",
-    role: "departmentHead" as UserRole,
-    department: "Computer Science",
-    profileImage: "https://ui-avatars.com/api/?name=Department+Head&background=random",
-  },
-  {
-    id: "3",
-    firstName: "Teacher",
-    lastName: "User",
-    email: "teacher@university.edu",
-    role: "teacher" as UserRole,
-    department: "Computer Science",
-    profileImage: "https://ui-avatars.com/api/?name=Teacher+User&background=random",
-  },
-  {
-    id: "4",
-    firstName: "Student",
-    lastName: "User",
-    email: "student@university.edu",
-    role: "student" as UserRole,
-    department: "Computer Science",
-    profileImage: "https://ui-avatars.com/api/?name=Student+User&background=random",
-  },
-];
+const API_URL = 'http://localhost:5000/api';
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -72,26 +35,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Load user from localStorage on initial render
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    const loadUser = async () => {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+      
+      if (storedToken && storedUser) {
+        try {
+          // Validate token with the backend
+          const res = await fetch(`${API_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${storedToken}`
+            }
+          });
+          
+          if (res.ok) {
+            setUser(JSON.parse(storedUser));
+          } else {
+            // Token invalid, clear storage
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+          }
+        } catch (err) {
+          console.error("Error validating token:", err);
+        }
+      }
+      
+      setIsLoading(false);
+    };
+    
+    loadUser();
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      // This would normally be an API call to your backend
-      // For now, we'll just simulate with mock users
-      const foundUser = MOCK_USERS.find(u => u.email === email);
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
       
-      if (foundUser && password === "password") { // simple mock password check
-        setUser(foundUser);
-        localStorage.setItem("user", JSON.stringify(foundUser));
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed. Please check your credentials.');
+      }
+
+      if (data.success && data.token && data.user) {
+        // Transform backend user to frontend user format
+        const loggedInUser: User = {
+          id: data.user.id,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          email: data.user.email,
+          role: data.user.role as UserRole,
+          department: data.user.department,
+          profileImage: data.user.profileImage || `https://ui-avatars.com/api/?name=${data.user.firstName}+${data.user.lastName}&background=random`,
+        };
+        
+        setUser(loggedInUser);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(loggedInUser));
       } else {
-        throw new Error("Invalid email or password");
+        throw new Error('Invalid response from server');
       }
     } catch (err) {
       setError((err as Error).message);
@@ -103,6 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem("token");
     localStorage.removeItem("user");
   };
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface LocationState {
   from?: {
@@ -19,17 +20,24 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const { login, error, isLoading } = useAuth();
+  const { login, error, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
   const from = state?.from?.pathname || "/dashboard";
 
+  useEffect(() => {
+    // Redirect if already authenticated
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await login(email, password);
-    // The AuthContext will handle setting the user and redirect will happen in AppLayout
   };
 
   return (
@@ -76,7 +84,11 @@ const Login: React.FC = () => {
                     className="text-xs text-navy hover:underline"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert("For demo purposes, use 'password' as the password");
+                      toast({
+                        title: "Password Reset",
+                        description: "This feature is not implemented yet.",
+                        variant: "default"
+                      });
                     }}
                   >
                     Forgot password?
@@ -93,12 +105,12 @@ const Login: React.FC = () => {
               </div>
 
               <div className="text-sm text-muted-foreground">
-                <p>Demo accounts (all use password: "password")</p>
+                <p>Demo accounts:</p>
                 <ul className="list-disc pl-5 mt-1">
-                  <li>admin@university.edu</li>
-                  <li>head@university.edu</li>
-                  <li>teacher@university.edu</li>
-                  <li>student@university.edu</li>
+                  <li>admin@university.edu (password: password)</li>
+                  <li>head@university.edu (password: password)</li>
+                  <li>teacher@university.edu (password: password)</li>
+                  <li>student@university.edu (password: password)</li>
                 </ul>
               </div>
             </CardContent>
