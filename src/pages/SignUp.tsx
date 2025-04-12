@@ -11,8 +11,14 @@ import { AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
+import DepartmentSelector from "@/components/DepartmentSelector";
+import { UserRole } from "@/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const SignUp: React.FC = () => {
+// Initialize the query client
+const queryClient = new QueryClient();
+
+const SignUpForm: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -22,7 +28,7 @@ const SignUp: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<string>("student");
+  const [role, setRole] = useState<UserRole>("student");
   const [department, setDepartment] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +52,12 @@ const SignUp: React.FC = () => {
     
     if (password.length < 6) {
       setError("Password must be at least 6 characters long");
+      return;
+    }
+
+    // Validate department selection for specific roles
+    if ((role === "teacher" || role === "departmentHead") && !department) {
+      setError(`Department selection is required for ${role === "teacher" ? "teachers" : "department heads"}`);
       return;
     }
 
@@ -159,27 +171,26 @@ const SignUp: React.FC = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={setRole}>
+                <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Student</SelectItem>
                     <SelectItem value="teacher">Teacher</SelectItem>
+                    <SelectItem value="departmentHead">Department Head</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500">Admin and Department Head roles can only be assigned by administrators</p>
+                <p className="text-xs text-gray-500">Admin roles can only be assigned by existing administrators</p>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="department">Department (Optional)</Label>
-                <Input
-                  id="department"
+              {(role === "teacher" || role === "departmentHead") && (
+                <DepartmentSelector
                   value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="Computer Science"
+                  onValueChange={setDepartment}
+                  required={true}
                 />
-              </div>
+              )}
             </CardContent>
             
             <CardFooter className="flex flex-col space-y-4">
@@ -208,6 +219,14 @@ const SignUp: React.FC = () => {
         </Card>
       </div>
     </div>
+  );
+};
+
+const SignUp: React.FC = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SignUpForm />
+    </QueryClientProvider>
   );
 };
 

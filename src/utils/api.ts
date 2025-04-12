@@ -3,6 +3,26 @@
  * API utility functions for making requests to the backend
  */
 
+// Define response types for better TypeScript support
+export interface AuthResponse {
+  success: boolean;
+  token: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    department?: string;
+    profileImage?: string;
+  };
+}
+
+export interface ApiErrorResponse {
+  success: boolean;
+  error: string;
+}
+
 const API_URL = 'http://localhost:5000/api';
 
 /**
@@ -57,7 +77,7 @@ export const apiRequest = async <T>(
       throw new Error(responseData.error || 'Something went wrong');
     }
 
-    return responseData;
+    return responseData as T;
   } catch (error) {
     console.error(`API Error (${method} ${endpoint}):`, error);
     throw error;
