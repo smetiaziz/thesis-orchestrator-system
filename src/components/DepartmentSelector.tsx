@@ -9,7 +9,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Department {
@@ -45,52 +45,48 @@ const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
 
   if (error) {
     return (
-      <FormItem>
-        <FormLabel>{label}{required && " *"}</FormLabel>
-        <FormControl>
-          <Select disabled value="" onValueChange={() => {}}>
-            <SelectTrigger>
-              <SelectValue placeholder="Failed to load departments" />
-            </SelectTrigger>
-          </Select>
-        </FormControl>
-        <FormMessage>Failed to load departments</FormMessage>
-      </FormItem>
+      <div className="space-y-2">
+        <Label>{label}{required && " *"}</Label>
+        <Select disabled value="" onValueChange={() => {}}>
+          <SelectTrigger>
+            <SelectValue placeholder="Failed to load departments" />
+          </SelectTrigger>
+        </Select>
+        <p className="text-sm font-medium text-destructive">Failed to load departments</p>
+      </div>
     );
   }
 
   return (
-    <FormItem>
-      <FormLabel>{label}{required && " *"}</FormLabel>
+    <div className="space-y-2">
+      <Label>{label}{required && " *"}</Label>
       {isLoading ? (
         <Skeleton className="h-10 w-full" />
       ) : (
-        <FormControl>
-          <Select 
-            disabled={disabled || isLoading} 
-            value={value} 
-            onValueChange={onValueChange}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.length === 0 ? (
-                <SelectItem value="" disabled>
-                  No departments available
+        <Select 
+          disabled={disabled || isLoading} 
+          value={value} 
+          onValueChange={onValueChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {departments.length === 0 ? (
+              <SelectItem value="" disabled>
+                No departments available
+              </SelectItem>
+            ) : (
+              departments.map((dept) => (
+                <SelectItem key={dept._id} value={dept._id}>
+                  {dept.name}
                 </SelectItem>
-              ) : (
-                departments.map((dept) => (
-                  <SelectItem key={dept._id} value={dept._id}>
-                    {dept.name}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </FormControl>
+              ))
+            )}
+          </SelectContent>
+        </Select>
       )}
-    </FormItem>
+    </div>
   );
 };
 
