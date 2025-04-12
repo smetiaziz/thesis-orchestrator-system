@@ -49,14 +49,19 @@ export const apiRequest = async <T>(
     options.body = JSON.stringify(data);
   }
 
-  const response = await fetch(url, options);
-  const responseData = await response.json();
+  try {
+    const response = await fetch(url, options);
+    const responseData = await response.json();
 
-  if (!response.ok) {
-    throw new Error(responseData.error || 'Something went wrong');
+    if (!response.ok) {
+      throw new Error(responseData.error || 'Something went wrong');
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error(`API Error (${method} ${endpoint}):`, error);
+    throw error;
   }
-
-  return responseData;
 };
 
 // API utility methods

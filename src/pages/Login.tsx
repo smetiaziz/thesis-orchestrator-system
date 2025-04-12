@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface LocationState {
   from?: {
@@ -115,7 +115,7 @@ const Login: React.FC = () => {
               </div>
             </CardContent>
             
-            <CardFooter>
+            <CardFooter className="flex flex-col space-y-4">
               <Button 
                 type="submit" 
                 className="w-full bg-navy hover:bg-navy/90" 
@@ -123,6 +123,19 @@ const Login: React.FC = () => {
               >
                 {isLoading ? "Logging in..." : "Log in"}
               </Button>
+              <div className="text-center text-sm">
+                Don't have an account?{" "}
+                <a
+                  href="/signup"
+                  className="text-navy hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/signup");
+                  }}
+                >
+                  Sign up
+                </a>
+              </div>
             </CardFooter>
           </form>
         </Card>
