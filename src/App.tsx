@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,8 +12,17 @@ import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
 import Index from "./pages/Index";
+import Departments from "./pages/Admin/Departments";
+import DataImport from "./pages/Admin/DataImport";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -47,10 +57,19 @@ const App = () => (
             />
             
             <Route
-              path="/data-sync"
+              path="/departments"
               element={
                 <AppLayout allowedRoles={["admin"]}>
-                  <Dashboard />
+                  <Departments />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/data-import"
+              element={
+                <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                  <DataImport />
                 </AppLayout>
               }
             />
