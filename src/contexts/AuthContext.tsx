@@ -1,14 +1,25 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from "react";
 import { User, UserRole } from "@/types";
+import { api } from "@/utils/api";
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
   error: string | null;
+}
+
+interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role?: UserRole;
+  department?: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
   login: async () => {},
+  register: async () => {},
   logout: () => {},
   error: null,
 });
@@ -25,8 +37,6 @@ export const useAuth = () => useContext(AuthContext);
 interface AuthProviderProps {
   children: ReactNode;
 }
-
-const API_URL = 'http://localhost:5000/api';
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -42,21 +52,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           // Validate token with the backend
-          const res = await fetch(`${API_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${storedToken}`
-            }
-          });
-          
-          if (res.ok) {
-            setUser(JSON.parse(storedUser));
-          } else {
-            // Token invalid, clear storage
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-          }
+          await api.get('/auth/me');
+          setUser(JSON.parse(storedUser));
         } catch (err) {
-          console.error("Error validating token:", err);
+          // Token invalid, clear storage
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
         }
       }
       
@@ -70,20 +71,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
+      const data = await api.post('/auth/login', { email, password }, false);
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed. Please check your credentials.');
-      }
-
       if (data.success && data.token && data.user) {
         // Transform backend user to frontend user format
         const loggedInUser: User = {
@@ -110,6 +99,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const register = async (userData: RegisterData) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.post('/auth/register', userData, false);
+    } catch (err) {
+      setError((err as Error).message);
+      console.error("Registration error:", err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem("token");
@@ -123,6 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated: !!user,
         isLoading,
         login,
+        register,
         logout,
         error,
       }}
