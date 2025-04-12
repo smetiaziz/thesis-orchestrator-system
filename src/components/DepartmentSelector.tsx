@@ -47,7 +47,7 @@ const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
     return (
       <div className="space-y-2">
         <Label>{label}{required && " *"}</Label>
-        <Select disabled value="" onValueChange={() => {}}>
+        <Select disabled value="error" onValueChange={() => {}}>
           <SelectTrigger>
             <SelectValue placeholder="Failed to load departments" />
           </SelectTrigger>
@@ -65,20 +65,21 @@ const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
       ) : (
         <Select 
           disabled={disabled || isLoading} 
-          value={value} 
+          value={value || "all"} // Ensure there's always a valid value
           onValueChange={onValueChange}
         >
           <SelectTrigger>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
             {departments.length === 0 ? (
-              <SelectItem value="" disabled>
+              <SelectItem value="no-departments">
                 No departments available
               </SelectItem>
             ) : (
               departments.map((dept) => (
-                <SelectItem key={dept._id} value={dept._id}>
+                <SelectItem key={dept._id} value={dept._id || "unknown"}>
                   {dept.name}
                 </SelectItem>
               ))

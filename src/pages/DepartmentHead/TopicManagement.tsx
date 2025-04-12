@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/utils/api";
@@ -63,8 +64,8 @@ const TopicManagement: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
-  const [selectedSupervisor, setSelectedSupervisor] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedSupervisor, setSelectedSupervisor] = useState("all"); // Changed from empty string to "all"
+  const [selectedStatus, setSelectedStatus] = useState("all"); // Changed from empty string to "all"
   const [topicToDelete, setTopicToDelete] = useState<PFETopic | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
   
@@ -82,11 +83,11 @@ const TopicManagement: React.FC = () => {
         queryParams.append('department', selectedDepartment);
       }
       
-      if (selectedSupervisor) {
+      if (selectedSupervisor && selectedSupervisor !== "all") {
         queryParams.append('supervisorId', selectedSupervisor);
       }
       
-      if (selectedStatus) {
+      if (selectedStatus && selectedStatus !== "all") {
         queryParams.append('status', selectedStatus);
       }
       
@@ -191,9 +192,9 @@ const TopicManagement: React.FC = () => {
                 <SelectValue placeholder="All Supervisors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Supervisors</SelectItem>
+                <SelectItem value="all">All Supervisors</SelectItem>
                 {teachers.map(teacher => (
-                  <SelectItem key={teacher._id} value={teacher._id}>
+                  <SelectItem key={teacher._id} value={teacher._id || "unknown"}>
                     {teacher.firstName} {teacher.lastName}
                   </SelectItem>
                 ))}
@@ -211,7 +212,7 @@ const TopicManagement: React.FC = () => {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="scheduled">Scheduled</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
