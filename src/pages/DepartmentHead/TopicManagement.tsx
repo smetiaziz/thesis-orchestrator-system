@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/utils/api";
@@ -36,7 +35,7 @@ import DepartmentSelector from "@/components/DepartmentSelector";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { FileSpreadsheet, Plus, Search, Edit, Trash, FileText } from "lucide-react";
-import { ExcelImport } from "@/components/ExcelImport";
+import ExcelImport from "@/components/ExcelImport";
 
 interface PFETopic {
   _id: string;
@@ -307,9 +306,11 @@ const TopicManagement: React.FC = () => {
         <ExcelImport 
           title="Import PFE Topics"
           endpoint="/topics/import"
-          templateFields={["topicName", "studentName", "studentEmail", "supervisorName", "department"]}
+          description="Import PFE topics from Excel file. The template should contain columns for topic name, student information, and supervisor details."
+          successMessage="PFE topics have been successfully imported"
+          errorMessage="Failed to import PFE topics"
           onSuccess={handleImportSuccess}
-          onCancel={() => setImportModalOpen(false)}
+          templateUrl="/templates/pfe_topics_template.xlsx"
         />
       )}
     </div>
