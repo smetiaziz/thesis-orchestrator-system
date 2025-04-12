@@ -5,7 +5,8 @@ const {
   getJury,
   createJury,
   updateJury,
-  deleteJury
+  deleteJury,
+  getScheduledDates
 } = require('../controllers/juryController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { check } = require('express-validator');
@@ -34,6 +35,10 @@ router
     juryValidation,
     createJury
   );
+
+router
+  .route('/scheduled-dates')
+  .get(getScheduledDates);
 
 router
   .route('/:id')
