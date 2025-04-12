@@ -68,6 +68,36 @@ exports.getJuries = async (req, res, next) => {
   }
 };
 
+// @desc    Get dates with scheduled juries
+// @route   GET /api/juries/scheduled-dates
+// @access  Private
+exports.getScheduledDates = async (req, res, next) => {
+  try {
+    let query = {};
+    
+    // Filter by department
+    if (req.query.department) {
+      const topics = await PFETopic.find({ department: req.query.department }).select('_id');
+      const topicIds = topics.map(topic => topic._id);
+      query.pfeTopicId = { $in: topicIds };
+    }
+    
+    // Get unique dates
+    const juries = await Jury.find(query).distinct('date');
+    
+    // Format dates as strings
+    const formattedDates = juries.map(date => date.toISOString().split('T')[0]);
+    
+    res.status(200).json({
+      success: true,
+      count: formattedDates.length,
+      data: formattedDates
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get single jury
 // @route   GET /api/juries/:id
 // @access  Private

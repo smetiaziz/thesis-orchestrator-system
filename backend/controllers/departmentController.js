@@ -1,3 +1,4 @@
+
 const Department = require('../models/Department');
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
@@ -110,7 +111,7 @@ exports.updateDepartment = async (req, res, next) => {
     }
 
     // If changing department head, verify the user exists and update roles
-    if (headId && headId !== department.headId.toString()) {
+    if (headId && headId !== department.headId?.toString()) {
       // Verify new head exists
       const newHead = await User.findById(headId);
       if (!newHead) {
@@ -187,6 +188,73 @@ exports.deleteDepartment = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Create a department head account
+// @route   POST /api/departments/create-head
+// @access  Private (Admin)
+exports.createDepartmentHead = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { firstName, lastName, email, password, departmentName } = req.body;
+
+    // Check if user with this email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+    }
+
+    // Create the user with departmentHead role
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      role: 'departmentHead',
+      department: departmentName
+    });
+
+    // Create or update department with this head
+    let department = await Department.findOne({ name: departmentName });
+    
+    if (department) {
+      // Update existing department with new head
+      department = await Department.findByIdAndUpdate(
+        department._id,
+        { headId: user._id },
+        { new: true }
+      );
+    } else {
+      // Create new department with this head
+      department = await Department.create({
+        name: departmentName,
+        headId: user._id
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role
+        },
+        department
+      }
     });
   } catch (err) {
     next(err);

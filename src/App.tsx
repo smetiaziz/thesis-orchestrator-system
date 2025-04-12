@@ -14,6 +14,11 @@ import Unauthorized from "./pages/Unauthorized";
 import Index from "./pages/Index";
 import Departments from "./pages/Admin/Departments";
 import DataImport from "./pages/Admin/DataImport";
+import DepartmentHeadDashboard from "./pages/DepartmentHead/Dashboard";
+import TopicManagement from "./pages/DepartmentHead/TopicManagement";
+import JuryAssignment from "./pages/DepartmentHead/JuryAssignment";
+import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement";
+import ParticipationTracker from "./pages/DepartmentHead/ParticipationTracker";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +42,7 @@ const App = () => (
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route path="/" element={<Index />} />
             
+            {/* Dashboard routes based on role */}
             <Route
               path="/dashboard"
               element={
@@ -85,10 +91,46 @@ const App = () => (
             
             {/* Department Head routes */}
             <Route
+              path="/department-dashboard"
+              element={
+                <AppLayout allowedRoles={["departmentHead", "admin"]}>
+                  <DepartmentHeadDashboard />
+                </AppLayout>
+              }
+            />
+            
+            <Route
               path="/topics"
               element={
                 <AppLayout allowedRoles={["departmentHead", "admin"]}>
+                  <TopicManagement />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/topics/new"
+              element={
+                <AppLayout allowedRoles={["departmentHead", "admin"]}>
                   <Dashboard />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/topics/:id/edit"
+              element={
+                <AppLayout allowedRoles={["departmentHead", "admin"]}>
+                  <Dashboard />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/topics/import"
+              element={
+                <AppLayout allowedRoles={["departmentHead", "admin"]}>
+                  <DataImport />
                 </AppLayout>
               }
             />
@@ -97,7 +139,7 @@ const App = () => (
               path="/juries"
               element={
                 <AppLayout allowedRoles={["departmentHead", "admin"]}>
-                  <Dashboard />
+                  <JuryAssignment />
                 </AppLayout>
               }
             />
@@ -105,8 +147,8 @@ const App = () => (
             <Route
               path="/schedule"
               element={
-                <AppLayout allowedRoles={["departmentHead", "admin", "student"]}>
-                  <Dashboard />
+                <AppLayout allowedRoles={["departmentHead", "admin", "student", "teacher"]}>
+                  <ScheduleManagement />
                 </AppLayout>
               }
             />
@@ -115,7 +157,7 @@ const App = () => (
               path="/participation"
               element={
                 <AppLayout allowedRoles={["departmentHead", "admin", "teacher"]}>
-                  <Dashboard />
+                  <ParticipationTracker />
                 </AppLayout>
               }
             />
