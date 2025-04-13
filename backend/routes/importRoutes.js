@@ -1,6 +1,7 @@
 
 const express = require('express');
-const { upload, importTopics, importTeachers } = require('../controllers/importController');
+const { upload, importTopics } = require('../controllers/importController');
+const { importTeachers } = require('../controllers/teacherImportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -29,7 +30,7 @@ router.post(
 // Import teachers route
 router.post(
   '/teachers',
-  authorize('admin'),
+  authorize('admin', 'departmentHead'),
   (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {
