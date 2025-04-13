@@ -1,6 +1,7 @@
 
 const express = require('express');
-const { upload, importTopics, importTeachers } = require('../controllers/importController');
+const { upload, importTopics } = require('../controllers/importController');
+const { importTeachers } = require('../controllers/teacherImportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
