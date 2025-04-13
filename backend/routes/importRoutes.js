@@ -1,6 +1,7 @@
 
 const express = require('express');
-const { upload, importTopics } = require('../controllers/importController');
+const { upload } = require('../utils/fileUtils');
+const { importTopics } = require('../controllers/topicImportController');
 const { importTeachers } = require('../controllers/teacherImportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -27,7 +28,7 @@ router.post(
   importTopics
 );
 
-// Import teachers route - Modified to handle Excel files properly
+// Import teachers route
 router.post(
   '/teachers',
   authorize('admin', 'departmentHead'),
