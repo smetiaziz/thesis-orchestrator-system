@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { FileUp, Check, AlertTriangle, Loader2 } from "lucide-react";
+import { FileUp, Check, AlertTriangle, Loader2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/utils/api";
 
@@ -32,6 +32,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorDetails, setErrorDetails] = useState<string>("");
+  const [uploadResult, setUploadResult] = useState<any>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,6 +46,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
         setFile(selectedFile);
         setUploadStatus("idle");
         setErrorDetails("");
+        setUploadResult(null);
       } else {
         toast({
           title: "Invalid file format",
@@ -62,6 +64,7 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
     setIsUploading(true);
     setUploadStatus("idle");
     setErrorDetails("");
+    setUploadResult(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -84,15 +87,18 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
       }
 
       setUploadStatus("success");
+      setUploadResult(data);
+      
       toast({
         title: "Import successful",
-        description: successMessage,
+        description: `${successMessage} (${data.count || 0} records imported)`,
       });
       
       if (onSuccess) {
         onSuccess();
       }
     } catch (error: any) {
+      console.error("Import error:", error);
       setUploadStatus("error");
       setErrorDetails(error.message);
       toast({
@@ -118,6 +124,14 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
           <AlertTitle className="text-green-600">Success</AlertTitle>
           <AlertDescription className="text-green-700">
             {successMessage}
+            {uploadResult && (
+              <div className="mt-2">
+                <p>Records imported: {uploadResult.count}</p>
+                {uploadResult.errors && uploadResult.errors.length > 0 && (
+                  <p>With {uploadResult.errors.length} warnings/errors</p>
+                )}
+              </div>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -166,11 +180,23 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
           {templateUrl && (
             <Button variant="outline" asChild>
               <a href={templateUrl} download>
+                <Download className="mr-2 h-4 w-4" />
                 Download Template
               </a>
             </Button>
           )}
         </div>
+        
+        {uploadResult && uploadResult.errors && uploadResult.errors.length > 0 && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+            <h3 className="font-semibold text-amber-800 mb-2">Warnings/Errors:</h3>
+            <ul className="list-disc pl-5 text-sm text-amber-700 space-y-1">
+              {uploadResult.errors.map((error: string, index: number) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </Card>
   );

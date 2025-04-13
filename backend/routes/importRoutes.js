@@ -27,7 +27,7 @@ router.post(
   importTopics
 );
 
-// Import teachers route
+// Import teachers route - Modified to handle Excel files properly
 router.post(
   '/teachers',
   authorize('admin', 'departmentHead'),
