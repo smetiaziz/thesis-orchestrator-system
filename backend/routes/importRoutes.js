@@ -29,7 +29,7 @@ router.post(
 // Import teachers route
 router.post(
   '/teachers',
-  authorize('admin'),
+  authorize('admin', 'departmentHead'),
   (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {

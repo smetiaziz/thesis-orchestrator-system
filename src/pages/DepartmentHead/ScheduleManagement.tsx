@@ -1,6 +1,5 @@
-
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,8 +12,19 @@ import {
   FileText, 
   ChevronLeft, 
   ChevronRight, 
-  Download 
+  Download,
+  Calendar as CalendarIcon,
+  Wand2 
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
 
 interface Jury {
   _id: string;
@@ -48,8 +58,11 @@ interface Jury {
 
 const ScheduleManagement: React.FC = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [autoScheduleDialogOpen, setAutoScheduleDialogOpen] = useState(false);
+  const [autoScheduleLoading, setAutoScheduleLoading] = useState(false);
   
   // Fetch juries for the selected date
   const { data: juriesResponse, isLoading } = useQuery({
@@ -78,6 +91,41 @@ const ScheduleManagement: React.FC = () => {
   
   const juries = juriesResponse?.data || [];
   const scheduledDates = scheduledDatesResponse?.data || [];
+
+  // Auto-generate juries mutation
+  const autoGenerateJuriesMutation = useMutation({
+    mutationFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedDepartment) {
+        params.append('department', selectedDepartment);
+      }
+      return api.post<{ success: boolean; data: any }>(`/juries/auto-generate?${params.toString()}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['juries'] });
+      queryClient.invalidateQueries({ queryKey: ['jury-dates'] });
+      toast({
+        title: "Auto-generation successful",
+        description: "Juries have been automatically scheduled based on availability",
+      });
+      setAutoScheduleDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Auto-generation failed",
+        description: error.message || "There was an error generating the schedules",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setAutoScheduleLoading(false);
+    }
+  });
+
+  const handleAutoGenerate = () => {
+    setAutoScheduleLoading(true);
+    autoGenerateJuriesMutation.mutate();
+  };
   
   // Function to check if a date has scheduled juries
   const isScheduledDate = (date: Date) => {
@@ -104,6 +152,15 @@ const ScheduleManagement: React.FC = () => {
         <h1 className="text-2xl font-bold text-navy">Presentation Schedule</h1>
         
         <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setAutoScheduleDialogOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Wand2 className="h-4 w-4" />
+            Auto-Generate Juries
+          </Button>
+          
           <Button variant="outline" asChild>
             <a href={generateExportUrl()} target="_blank" rel="noopener noreferrer">
               <Download className="mr-2 h-4 w-4" />
@@ -258,6 +315,41 @@ const ScheduleManagement: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Auto-Generate Juries Dialog */}
+      <Dialog open={autoScheduleDialogOpen} onOpenChange={setAutoScheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Auto-Generate Jury Schedule</DialogTitle>
+            <DialogDescription>
+              This will automatically assign juries to presentations based on teacher availability and quota requirements.
+              {selectedDepartment && <p className="mt-2">Department: {selectedDepartment}</p>}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <p className="text-sm text-muted-foreground">
+            The system will:
+            <ul className="list-disc pl-5 mt-1 space-y-1">
+              <li>Find all pending PFE topics</li>
+              <li>Check teacher availability</li>
+              <li>Ensure no scheduling conflicts</li>
+              <li>Balance participation based on quota requirements</li>
+            </ul>
+          </p>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoScheduleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAutoGenerate} 
+              disabled={autoScheduleLoading}
+            >
+              {autoScheduleLoading ? "Generating..." : "Generate Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

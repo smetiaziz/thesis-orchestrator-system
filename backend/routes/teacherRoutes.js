@@ -26,7 +26,7 @@ const teacherValidation = [
 
 router
   .route('/')
-  .get(getTeachers)
+  .get(authorize('admin', 'departmentHead'), getTeachers)
   .post(
     authorize('admin', 'departmentHead'),
     teacherValidation,
@@ -35,7 +35,7 @@ router
 
 router
   .route('/:id')
-  .get(getTeacher)
+  .get(authorize('admin', 'departmentHead'), getTeacher)
   .put(
     authorize('admin', 'departmentHead'),
     updateTeacher
@@ -48,7 +48,7 @@ router
 router
   .route('/import')
   .post(
-    authorize('admin'),
+    authorize('admin', 'departmentHead'),
     importTeachers
   );
 
