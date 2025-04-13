@@ -3,18 +3,65 @@ const Teacher = require('../models/Teacher');
 const User = require('../models/User');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const xlsx = require('xlsx');
+const fs = require('fs');
 
-// @desc    Import teachers from Excel/JSON
-// @route   POST /api/teachers/import
-// @access  Private (Admin)
+// Helper function to convert Excel file to JSON
+const excelToJson = (filePath) => {
+  try {
+    const workbook = xlsx.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = xlsx.utils.sheet_to_json(worksheet);
+    return data;
+  } catch (error) {
+    throw new Error(`Error parsing Excel file: ${error.message}`);
+  }
+};
+
+// @desc    Import teachers from Excel
+// @route   POST /api/import/teachers
+// @access  Private (Admin, Department Head)
 exports.importTeachers = async (req, res, next) => {
   try {
-    const { teachers } = req.body;
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Excel file uploaded'
+      });
+    }
+
+    // Convert Excel file to JSON
+    const teachers = excelToJson(req.file.path);
     
+    // Clean up file after processing
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
     if (!teachers || !Array.isArray(teachers) || teachers.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Please provide valid teachers data'
+      });
+    }
+
+    // Validate required fields in teacher data
+    const requiredFields = ['firstName', 'lastName', 'email', 'department', 'rank'];
+    const missingFields = [];
+    
+    for (const teacher of teachers) {
+      const missing = requiredFields.filter(field => !teacher[field]);
+      if (missing.length > 0) {
+        missingFields.push(`Row with email ${teacher.email || 'unknown'} is missing: ${missing.join(', ')}`);
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid data format: ${missingFields.join('; ')}`
       });
     }
     
@@ -90,7 +137,7 @@ exports.importTeachers = async (req, res, next) => {
           importedTeachers.push(newTeacher);
         }
       } catch (err) {
-        errors.push(`Teacher ${i+1}: ${err.message}`);
+        errors.push(`Teacher ${i+1} (${teacherData.email || 'unknown'}): ${err.message}`);
       }
     }
     
@@ -101,6 +148,7 @@ exports.importTeachers = async (req, res, next) => {
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (err) {
+    console.error('Import error:', err);
     next(err);
   }
 };
