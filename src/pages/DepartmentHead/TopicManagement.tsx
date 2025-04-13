@@ -191,7 +191,7 @@ const TopicManagement: React.FC = () => {
                 <SelectValue placeholder="All Supervisors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Supervisors</SelectItem>
+                <SelectItem value="all">All Supervisors</SelectItem>
                 {teachers.map(teacher => (
                   <SelectItem key={teacher._id} value={teacher._id}>
                     {teacher.firstName} {teacher.lastName}
@@ -211,7 +211,7 @@ const TopicManagement: React.FC = () => {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="scheduled">Scheduled</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
