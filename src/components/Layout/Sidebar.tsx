@@ -7,7 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   Home, Users, Calendar, FileSpreadsheet, 
   Settings, User, BookOpen, ClipboardList, 
-  BarChart4, LogOut, Menu, X, Building2, Upload 
+  BarChart4, LogOut, Menu, X, Building2, Upload, School
 } from "lucide-react";
 
 const Sidebar: React.FC = () => {
@@ -31,12 +31,14 @@ const Sidebar: React.FC = () => {
     const roleSpecificLinks = {
       admin: [
         { to: "/users", icon: <Users className="h-5 w-5" />, text: "User Management" },
+        { to: "/teachers", icon: <School className="h-5 w-5" />, text: "Teachers" },
         { to: "/departments", icon: <Building2 className="h-5 w-5" />, text: "Departments" },
         { to: "/data-import", icon: <Upload className="h-5 w-5" />, text: "Data Import" },
         { to: "/settings", icon: <Settings className="h-5 w-5" />, text: "System Settings" },
       ],
       departmentHead: [
         { to: "/topics", icon: <BookOpen className="h-5 w-5" />, text: "PFE Topics" },
+        { to: "/teachers", icon: <School className="h-5 w-5" />, text: "Teachers" },
         { to: "/juries", icon: <Users className="h-5 w-5" />, text: "Jury Assignment" },
         { to: "/schedule", icon: <Calendar className="h-5 w-5" />, text: "Schedule" },
         { to: "/data-import", icon: <Upload className="h-5 w-5" />, text: "Import Data" },

@@ -19,6 +19,9 @@ import TopicManagement from "./pages/DepartmentHead/TopicManagement";
 import JuryAssignment from "./pages/DepartmentHead/JuryAssignment";
 import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement";
 import ParticipationTracker from "./pages/DepartmentHead/ParticipationTracker";
+import TeachersList from "./pages/Admin/TeachersList";
+import NewTeacher from "./pages/Admin/NewTeacher";
+import EditTeacher from "./pages/Admin/EditTeacher";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +88,32 @@ const App = () => (
               element={
                 <AppLayout>
                   <Dashboard />
+                </AppLayout>
+              }
+            />
+
+            {/* Teacher management routes */}
+            <Route
+              path="/teachers"
+              element={
+                <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                  <TeachersList />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/teachers/new"
+              element={
+                <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                  <NewTeacher />
+                </AppLayout>
+              }
+            />
+            <Route
+              path="/teachers/:id/edit"
+              element={
+                <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                  <EditTeacher />
                 </AppLayout>
               }
             />
