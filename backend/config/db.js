@@ -9,6 +9,14 @@ const connectDB = async () => {
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    
+    // List all collections in the database
+    const collections = await conn.connection.db.collections();
+    console.log('Available collections:');
+    collections.forEach(collection => {
+      console.log(`- ${collection.collectionName}`);
+    });
+    
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
