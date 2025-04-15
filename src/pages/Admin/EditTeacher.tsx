@@ -1,3 +1,4 @@
+
 import React from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -8,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const EditTeacher: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
-  const { data: teacherData, isLoading, error } = useQuery<{ success: boolean; data: any }>({
+  const { data: teacherData, isLoading, error } = useQuery({
     queryKey: ['teacher', id],
     queryFn: async () => {
       if (!id) throw new Error("Teacher ID is required");
@@ -44,7 +45,7 @@ const EditTeacher: React.FC = () => {
     );
   }
 
-  return <TeacherForm teacherId={id} initialData={teacherData?.data} />;
+  return <TeacherForm teacherId={id} initialData={teacherData.data} />;
 };
 
 export default EditTeacher;

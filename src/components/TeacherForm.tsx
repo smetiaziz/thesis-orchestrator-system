@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -16,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api } from "@/utils/api";
 import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Textarea } from "@/components/ui/textarea";
 
 const teacherFormSchema = z.object({
   firstName: z.string().min(2, {
@@ -34,26 +34,26 @@ const teacherFormSchema = z.object({
   rank: z.string().min(1, {
     message: "Rank must be selected.",
   }),
-  course: z.number().min(0, {
+  course: z.coerce.number().min(0, {
     message: "Course hours must be a non-negative number.",
   }),
-  td: z.number().min(0, {
+  td: z.coerce.number().min(0, {
     message: "TD hours must be a non-negative number.",
   }),
-  tp: z.number().min(0, {
+  tp: z.coerce.number().min(0, {
     message: "TP hours must be a non-negative number.",
   }),
-  coefficient: z.number().min(1, {
+  coefficient: z.coerce.number().min(1, {
     message: "Coefficient must be at least 1.",
   }),
-  numSupervisionSessions: z.number().min(0, {
+  numSupervisionSessions: z.coerce.number().min(0, {
     message: "Number of supervision sessions must be a non-negative number.",
   }),
 });
 
 interface TeacherFormProps {
   teacherId?: string;
-  initialData?: Teacher;
+  initialData?: any;
 }
 
 const TeacherForm: React.FC<TeacherFormProps> = ({ teacherId, initialData }) => {
@@ -63,7 +63,7 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacherId, initialData }) => 
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const response = await api.get<{ success: boolean; data: { id: string; name: string; }[]>}>('/departments');
+        const response = await api.get<{ success: boolean; data: { id: string; name: string; }[]}>('/departments');
         if (response.success) {
           setDepartments(response.data);
         } else {
@@ -131,175 +131,165 @@ const TeacherForm: React.FC<TeacherFormProps> = ({ teacherId, initialData }) => 
     }
   }
 
-  const DepartmentSelector: React.FC<{ defaultValue: string; onSelect: (value: string) => void }> = ({ defaultValue, onSelect }) => {
-    return (
-      <FormField
-        control={form.control}
-        name="department"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Department</FormLabel>
-            <Select onValueChange={(value) => {
-              field.onChange(value);
-              onSelect(value);
-            }} defaultValue={defaultValue}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a department" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {departments.map((department) => (
-                  <SelectItem key={department.id} value={department.name}>{department.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    );
-  };
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 animate-fade-in">
-      <FormField
-        control={form.control}
-        name="firstName"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>First Name</FormLabel>
-            <FormControl>
-              <Input placeholder="Enter first name" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="lastName"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Last Name</FormLabel>
-            <FormControl>
-              <Input placeholder="Enter last name" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="email"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Email</FormLabel>
-            <FormControl>
-              <Input placeholder="Enter email" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      
-      <DepartmentSelector 
-        defaultValue={initialData?.department || ''} 
-        onSelect={(value: string) => setValue('department', value)}
-      />
-      
-      <FormField
-        control={form.control}
-        name="rank"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Rank</FormLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
+    <Form {...form}>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 animate-fade-in">
+        <FormField
+          control={form.control}
+          name="firstName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>First Name</FormLabel>
               <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a rank" />
-                </SelectTrigger>
+                <Input placeholder="Enter first name" {...field} />
               </FormControl>
-              <SelectContent>
-                <SelectItem value="Professor">Professor</SelectItem>
-                <SelectItem value="Assistant Professor">Assistant Professor</SelectItem>
-                <SelectItem value="Associate Professor">Associate Professor</SelectItem>
-                <SelectItem value="Lecturer">Lecturer</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="course"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Course Hours</FormLabel>
-            <FormControl>
-              <Input type="number" placeholder="Enter course hours" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="td"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>TD Hours</FormLabel>
-            <FormControl>
-              <Input type="number" placeholder="Enter TD hours" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="tp"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>TP Hours</FormLabel>
-            <FormControl>
-              <Input type="number" placeholder="Enter TP hours" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="coefficient"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Coefficient</FormLabel>
-            <FormControl>
-              <Input type="number" placeholder="Enter coefficient" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="numSupervisionSessions"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Number of Supervision Sessions</FormLabel>
-            <FormControl>
-              <Input type="number" placeholder="Enter number of supervision sessions" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <Button type="submit" disabled={!isValid}>
-        {teacherId ? "Update Teacher" : "Create Teacher"}
-      </Button>
-    </form>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="lastName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Last Name</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter last name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter email" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="department"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Department</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a department" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.name}>{department.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="rank"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Rank</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a rank" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Professor">Professor</SelectItem>
+                  <SelectItem value="Assistant Professor">Assistant Professor</SelectItem>
+                  <SelectItem value="Associate Professor">Associate Professor</SelectItem>
+                  <SelectItem value="Lecturer">Lecturer</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="course"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Hours</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter course hours" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="td"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>TD Hours</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter TD hours" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="tp"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>TP Hours</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter TP hours" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="coefficient"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Coefficient</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter coefficient" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="numSupervisionSessions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Number of Supervision Sessions</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter number of supervision sessions" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={!isValid}>
+          {teacherId ? "Update Teacher" : "Create Teacher"}
+        </Button>
+      </form>
+    </Form>
   );
 };
 

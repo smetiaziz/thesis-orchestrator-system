@@ -1,8 +1,9 @@
+
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/utils/api";
 import { Teacher } from "@/types";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -11,17 +12,19 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Plus } from "lucide-react";
+import { Plus, Edit, Trash } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 const TeacherSidebar: React.FC = () => {
-  const { data: teachersData } = useQuery<{ success: boolean; data: Teacher[] }>({
+  const navigate = useNavigate();
+  const { data: teachersData, refetch } = useQuery<{ success: boolean; data: Teacher[] }>({
     queryKey: ['teachers'],
     queryFn: async () => {
       const response = await api.get('/teachers');
@@ -30,6 +33,28 @@ const TeacherSidebar: React.FC = () => {
   });
 
   const teachers = teachersData?.data || [];
+
+  const handleDeleteTeacher = async (teacherId: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (window.confirm("Are you sure you want to delete this teacher?")) {
+      try {
+        await api.delete(`/teachers/${teacherId}`);
+        toast({
+          title: "Success",
+          description: "Teacher deleted successfully.",
+        });
+        refetch();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete teacher.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -44,8 +69,15 @@ const TeacherSidebar: React.FC = () => {
               {teachers.map((teacher) => (
                 <SidebarMenuItem key={teacher.id}>
                   <SidebarMenuButton asChild>
-                    <Link to={`/admin/teachers/${teacher.id}`}>{teacher.firstName} {teacher.lastName}</Link>
+                    <Link to={`/admin/teachers/${teacher.id}/edit`}>
+                      {teacher.firstName} {teacher.lastName}
+                    </Link>
                   </SidebarMenuButton>
+                  <SidebarMenuAction asChild>
+                    <button onClick={(e) => handleDeleteTeacher(teacher.id, e)}>
+                      <Trash className="h-4 w-4" />
+                    </button>
+                  </SidebarMenuAction>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
