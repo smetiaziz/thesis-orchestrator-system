@@ -5,15 +5,21 @@ import { useQuery } from "@tanstack/react-query";
 import TeacherForm from "@/components/TeacherForm";
 import { api } from "@/utils/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Teacher } from "@/types";
+
+type TeacherResponse = {
+  success: boolean;
+  data: Teacher;
+};
 
 const EditTeacher: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
-  const { data: teacherData, isLoading, error } = useQuery({
+  const { data: teacherData, isLoading, error } = useQuery<TeacherResponse>({
     queryKey: ['teacher', id],
     queryFn: async () => {
       if (!id) throw new Error("Teacher ID is required");
-      const response = await api.get(`/teachers/${id}`);
+      const response = await api.get<TeacherResponse>(`/teachers/${id}`);
       return response;
     },
     enabled: !!id
