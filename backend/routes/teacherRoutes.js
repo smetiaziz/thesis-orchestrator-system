@@ -5,8 +5,7 @@ const {
   getTeacher,
   createTeacher,
   updateTeacher,
-  deleteTeacher,
-  importTeachers
+  deleteTeacher
 } = require('../controllers/teacherController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { check } = require('express-validator');
@@ -45,11 +44,6 @@ router
     deleteTeacher
   );
 
-router
-  .route('/import')
-  .post(
-    authorize('admin', 'departmentHead'),
-    importTeachers
-  );
+// Remove the import route from here, as it's now handled in importRoutes.js
 
 module.exports = router;

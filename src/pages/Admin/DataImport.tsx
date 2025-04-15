@@ -37,7 +37,7 @@ const DataImport: React.FC = () => {
             </CardHeader>
             <CardContent>
               <ExcelImport 
-                endpoint="/topics/import"
+                endpoint="/import/topics"
                 title="Import PFE Topics"
                 description="Upload an Excel file containing topic details, student names, and supervisor assignments."
                 successMessage="PFE topics have been successfully imported."
@@ -71,7 +71,7 @@ const DataImport: React.FC = () => {
             </CardHeader>
             <CardContent>
               <ExcelImport 
-                endpoint="/teachers/import"
+                endpoint="/import/teachers"
                 title="Import Teacher Data"
                 description="Upload an Excel file containing teacher information, teaching loads, and department assignments."
                 successMessage="Teachers have been successfully imported."

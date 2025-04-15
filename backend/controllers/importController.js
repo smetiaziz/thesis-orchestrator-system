@@ -1,7 +1,10 @@
 
-const { upload } = require('../utils/fileUtils');
-const { importTopics } = require('./topicImportController');
+// This file is now just a re-export of specific import controllers
+// Individual import controllers contain the actual implementation
 
-// Export the upload middleware and import functions
-exports.upload = upload;
+// Re-export specific import controllers
+const { importTopics } = require('./topicImportController');
+const { importTeachers } = require('./teacherImportController');
+
 exports.importTopics = importTopics;
+exports.importTeachers = importTeachers;
