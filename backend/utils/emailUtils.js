@@ -4,20 +4,41 @@ const nodemailer = require('nodemailer');
 // Helper function to send welcome email with credentials
 exports.sendWelcomeEmail = async (email, firstName, lastName, password) => {
   try {
-    // Create a test SMTP transporter object
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    // Create a transporter object with configuration
+    let transporter;
+    
+    // Check if we're in development environment
+    if (process.env.NODE_ENV !== 'production') {
+      // Use ethereal.email for testing in development
+      const testAccount = await nodemailer.createTestAccount();
+      
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass
+        }
+      });
+      
+      console.log('Using test email account for development');
+    } else {
+      // Use configured email service in production
+      transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: process.env.EMAIL_PORT || 587,
+        secure: process.env.EMAIL_SECURE === 'true',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+    }
 
     // Send email with defined transport object
-    await transporter.sendMail({
-      from: `"PFE Management System" <${process.env.EMAIL_FROM}>`,
+    const info = await transporter.sendMail({
+      from: `"PFE Management System" <${process.env.EMAIL_FROM || 'noreply@pfemanager.com'}>`,
       to: email,
       subject: "Welcome to PFE Management System",
       html: `
@@ -33,6 +54,11 @@ exports.sendWelcomeEmail = async (email, firstName, lastName, password) => {
         </div>
       `
     });
+
+    // If using test account, log the URL where message preview is available
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Email preview URL: ${nodemailer.getTestMessageUrl(info)}`);
+    }
 
     console.log(`Welcome email sent to: ${email}`);
     return true;

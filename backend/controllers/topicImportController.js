@@ -1,5 +1,6 @@
 
 const PFETopic = require('../models/PFETopic');
+const Teacher = require('../models/Teacher');
 const { readExcelFile, cleanUp } = require('../utils/fileUtils');
 
 // @desc    Import PFE Topics from Excel file
@@ -44,6 +45,27 @@ exports.importTopics = async (req, res, next) => {
 
     for (const row of data) {
       try {
+        // Find supervisor by ID or create a mapping for them
+        let supervisorId = row.supervisorId;
+        let supervisorName = row.supervisorName;
+        
+        if (!supervisorId && row.supervisorEmail) {
+          // Try to find supervisor by email
+          const supervisor = await Teacher.findOne({ email: row.supervisorEmail });
+          if (supervisor) {
+            supervisorId = supervisor._id;
+            supervisorName = `${supervisor.firstName} ${supervisor.lastName}`;
+          }
+        }
+        
+        if (!supervisorId) {
+          importResults.errors.push({
+            row: row.topicName,
+            error: 'Supervisor ID or email is required'
+          });
+          continue;
+        }
+
         // Check if topic already exists
         const existingTopic = await PFETopic.findOne({
           topicName: row.topicName,
@@ -53,23 +75,29 @@ exports.importTopics = async (req, res, next) => {
         if (existingTopic) {
           // Update existing topic
           await PFETopic.findByIdAndUpdate(existingTopic._id, {
-            supervisorId: row.supervisorId,
-            supervisorName: row.supervisorName,
+            supervisorId: supervisorId,
+            supervisorName: supervisorName || row.supervisorName,
             department: row.department,
             studentEmail: row.studentEmail || existingTopic.studentEmail,
             status: row.status || existingTopic.status
           });
         } else {
           // Create new topic
-          await PFETopic.create({
+          const newTopic = await PFETopic.create({
             topicName: row.topicName,
             studentName: row.studentName,
             studentEmail: row.studentEmail,
-            supervisorId: row.supervisorId,
-            supervisorName: row.supervisorName,
+            supervisorId: supervisorId,
+            supervisorName: supervisorName || row.supervisorName,
             department: row.department,
             status: row.status || 'pending'
           });
+          
+          // Update teacher's supervisedProjects
+          await Teacher.findByIdAndUpdate(
+            supervisorId,
+            { $addToSet: { supervisedProjects: newTopic._id } }
+          );
         }
 
         importResults.imported++;
