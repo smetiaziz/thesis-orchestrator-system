@@ -59,7 +59,14 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsUploading(true);
     setUploadStatus("idle");
@@ -87,11 +94,11 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
       }
 
       setUploadStatus("success");
-      setUploadResult(data);
+      setUploadResult(data.data);
       
       toast({
         title: "Import successful",
-        description: `${successMessage} (${data.count || 0} records imported)`,
+        description: successMessage,
       });
       
       if (onSuccess) {
@@ -126,7 +133,10 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
             {successMessage}
             {uploadResult && (
               <div className="mt-2">
-                <p>Records imported: {uploadResult.count}</p>
+                <p>Records imported: {uploadResult.imported || uploadResult.count || 0}</p>
+                {uploadResult.emailsSent && (
+                  <p>Welcome emails sent: {uploadResult.emailsSent}</p>
+                )}
                 {uploadResult.errors && uploadResult.errors.length > 0 && (
                   <p>With {uploadResult.errors.length} warnings/errors</p>
                 )}
