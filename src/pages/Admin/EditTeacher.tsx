@@ -9,12 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 const EditTeacher: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
-  const { data: teacher, isLoading, error } = useQuery({
+  const { data: teacherData, isLoading, error } = useQuery({
     queryKey: ['teacher', id],
     queryFn: async () => {
       if (!id) throw new Error("Teacher ID is required");
       const response = await api.get(`/teachers/${id}`);
-      return response.data.data;
+      return response;
     },
     enabled: !!id
   });
@@ -36,7 +36,7 @@ const EditTeacher: React.FC = () => {
     );
   }
 
-  if (error || !teacher) {
+  if (error || !teacherData) {
     return (
       <div className="p-6 text-destructive">
         <p>Error loading teacher data.</p>
@@ -45,7 +45,7 @@ const EditTeacher: React.FC = () => {
     );
   }
 
-  return <TeacherForm teacherId={id} initialData={teacher} />;
+  return <TeacherForm teacherId={id} initialData={teacherData.data} />;
 };
 
 export default EditTeacher;

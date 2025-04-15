@@ -101,22 +101,18 @@ const App = () => (
                 </AppLayout>
               }
             />
+            
             <Route
-              path="/teachers/new"
+              path="/admin/teachers"
               element={
                 <AppLayout allowedRoles={["admin", "departmentHead"]}>
-                  <NewTeacher />
+                  <TeachersList />
                 </AppLayout>
               }
-            />
-            <Route
-              path="/teachers/:id/edit"
-              element={
-                <AppLayout allowedRoles={["admin", "departmentHead"]}>
-                  <EditTeacher />
-                </AppLayout>
-              }
-            />
+            >
+              <Route path="new" element={<NewTeacher />} />
+              <Route path=":id/edit" element={<EditTeacher />} />
+            </Route>
             
             {/* Department Head routes */}
             <Route

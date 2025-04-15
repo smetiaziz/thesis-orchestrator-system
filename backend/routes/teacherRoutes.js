@@ -5,10 +5,13 @@ const {
   getTeacher,
   createTeacher,
   updateTeacher,
-  deleteTeacher
+  deleteTeacher,
+  importTeachers
 } = require('../controllers/teacherController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { check } = require('express-validator');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 const router = express.Router();
 
@@ -44,6 +47,12 @@ router
     deleteTeacher
   );
 
-// Remove the import route from here, as it's now handled in importRoutes.js
+// Import route
+router.post(
+  '/import',
+  authorize('admin', 'departmentHead'),
+  upload.single('file'),
+  importTeachers
+);
 
 module.exports = router;
