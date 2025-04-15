@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   firstName: string;
@@ -7,6 +8,8 @@ export interface User {
   department?: string;
   profileImage?: string;
 }
+
+export type UserRole = "admin" | "teacher" | "student" | "departmentHead";
 
 export interface Department {
   id: string;

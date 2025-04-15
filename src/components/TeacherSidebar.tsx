@@ -27,7 +27,7 @@ const TeacherSidebar: React.FC = () => {
   const { data: teachersData, refetch } = useQuery<{ success: boolean; data: Teacher[] }>({
     queryKey: ['teachers'],
     queryFn: async () => {
-      const response = await api.get('/teachers');
+      const response = await api.get<{ success: boolean; data: Teacher[] }>('/teachers');
       return response;
     }
   });
