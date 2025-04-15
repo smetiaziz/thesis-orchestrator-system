@@ -147,7 +147,7 @@ const TopicManagement: React.FC = () => {
   return (
     <div className="py-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-navy">PFE Topics Management</h1>
+        <h1 className="text-2xl font-bold text-purple-600">PFE Topics Management</h1>
         
         <div className="flex gap-4">
           <Button variant="outline" onClick={() => setImportModalOpen(true)}>

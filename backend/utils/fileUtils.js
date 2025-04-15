@@ -32,10 +32,23 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Upload middleware
+// Add error handling for file size limits
 exports.upload = multer({
   storage: storage,
-  fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 } // Limit to 10MB
+  fileFilter: (req, file, cb) => {
+    // Keep existing filter but improve error messages
+    const allowedMimes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only Excel files (.xls, .xlsx) are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }
 }).single('file');
 
 // Helper function to read Excel file
