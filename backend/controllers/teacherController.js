@@ -70,7 +70,7 @@ exports.createTeacher = async (req, res, next) => {
         firstName: req.body.firstName,
         lastName: req.body.lastName,
         email: req.body.email,
-        password: Math.random().toString(36).slice(-8), // Generate random password
+        password: 'password', // Generate random password
         role: 'teacher',
         department: req.body.department
       });

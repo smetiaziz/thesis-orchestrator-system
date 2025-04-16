@@ -59,7 +59,7 @@ exports.importTeachers = async (req, res, next) => {
         
         if (!user) {
           // Generate a random password
-          password = crypto.randomBytes(8).toString('hex');
+          password = 'password';
           
           // Create new user with teacher role
           user = await User.create([{
