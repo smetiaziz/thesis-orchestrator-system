@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/utils/api";
@@ -24,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 interface Jury {
   _id: string;
@@ -89,8 +90,8 @@ const ScheduleManagement: React.FC = () => {
     }
   });
   
-  const juries = juriesResponse?.data || [];
-  const scheduledDates = scheduledDatesResponse?.data || [];
+  const juries = juriesResponse?.data?.data || [];
+  const scheduledDates = scheduledDatesResponse?.data?.data || [];
 
   // Auto-generate juries mutation
   const autoGenerateJuriesMutation = useMutation({

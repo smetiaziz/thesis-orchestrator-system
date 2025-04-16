@@ -5,25 +5,18 @@ import { api } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  AlertCircle,
+  FileUp,
+  Plus,
+  Search,
+  Trash,
+  FileEdit,
+  File,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,412 +24,509 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { toast } from "@/components/ui/use-toast";
-import { FileSpreadsheet, Plus, Search, Edit, Trash, UserPlus, FileText } from "lucide-react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ExcelImport from "@/components/ExcelImport";
-import { Student } from "@/types";
+import { Textarea } from "@/components/ui/textarea";
 
-const formSchema = z.object({
-  firstName: z.string().min(1, { message: "First name is required" }),
-  lastName: z.string().min(1, { message: "Last name is required" }),
-  inscrNumber: z.string().min(1, { message: "Inscription number is required" }),
-  email: z.string().email({ message: "Invalid email" }).optional().or(z.literal("")),
-  field: z.string().optional(),
-  subject: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+interface Student {
+  id?: string;
+  _id?: string;
+  firstName: string;
+  lastName: string;
+  inscrNumber: string;
+  email?: string;
+  department?: string;
+  field?: string;
+  subject?: string;
+  supervisorId?: string;
+}
 
 const StudentSupervision: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
-  const [searchTerm, setSearchTerm] = useState("");
-  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newStudentDialogOpen, setNewStudentDialogOpen] = useState(false);
+  const [editStudentDialogOpen, setEditStudentDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [formData, setFormData] = useState<Student>({
+    firstName: "",
+    lastName: "",
+    inscrNumber: "",
+    email: "",
+    field: "",
+    subject: "",
+  });
+
+  // Fetch students supervised by the current teacher
+  const { data: studentsResponse, isLoading } = useQuery({
+    queryKey: ['supervised-students'],
+    queryFn: async () => {
+      return api.get<{ success: boolean; data: Student[] }>('/students/supervised');
+    },
+    enabled: !!user,
+  });
+
+  const students = studentsResponse?.data?.data || [];
+
+  const filteredStudents = students.filter(student => {
+    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
+    const searchLower = searchQuery.toLowerCase();
+    return fullName.includes(searchLower) || 
+           (student.inscrNumber && student.inscrNumber.toLowerCase().includes(searchLower)) ||
+           (student.email && student.email.toLowerCase().includes(searchLower));
+  });
+
+  // Add student mutation
+  const addStudentMutation = useMutation({
+    mutationFn: (student: Student) => {
+      return api.post('/students', student);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
+      toast({
+        title: "Student added",
+        description: "The student has been successfully added to your supervision.",
+      });
+      setNewStudentDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to add student",
+        description: error.message || "There was an error adding the student.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update student mutation
+  const updateStudentMutation = useMutation({
+    mutationFn: (student: Student) => {
+      return api.put(`/students/${student.id || student._id}`, student);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
+      toast({
+        title: "Student updated",
+        description: "The student information has been successfully updated.",
+      });
+      setEditStudentDialogOpen(false);
+      setSelectedStudent(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update student",
+        description: error.message || "There was an error updating the student information.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete student mutation
+  const deleteStudentMutation = useMutation({
+    mutationFn: (studentId: string) => {
+      return api.delete(`/students/${studentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
+      toast({
+        title: "Student removed",
+        description: "The student has been removed from your supervision.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to remove student",
+        description: error.message || "There was an error removing the student.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Import students mutation
+  const importStudentsMutation = useMutation({
+    mutationFn: (formData: FormData) => {
+      return api.post('/import/students', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
+      toast({
+        title: "Students imported",
+        description: `${response.data.data.length} students have been successfully imported.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import failed",
+        description: error.message || "There was an error importing students.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    addStudentMutation.mutate(formData);
+  };
+
+  const handleUpdateStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedStudent) {
+      updateStudentMutation.mutate(formData);
+    }
+  };
+
+  const handleDeleteStudent = (studentId: string) => {
+    if (confirm("Are you sure you want to remove this student from your supervision?")) {
+      deleteStudentMutation.mutate(studentId);
+    }
+  };
+
+  const handleEditStudent = (student: Student) => {
+    setSelectedStudent(student);
+    setFormData({
+      ...student,
+      id: student._id || student.id,
+    });
+    setEditStudentDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
       firstName: "",
       lastName: "",
       inscrNumber: "",
       email: "",
       field: "",
       subject: "",
-    },
-  });
-  
-  // Fetch students supervised by the current teacher
-  const { data: studentsResponse, isLoading } = useQuery({
-    queryKey: ['supervised-students', searchTerm],
-    queryFn: async () => {
-      let url = '/students/supervised';
-      if (searchTerm) {
-        url += `?search=${encodeURIComponent(searchTerm)}`;
-      }
-      return api.get<{ success: boolean; data: Student[] }>(url);
-    }
-  });
-  
-  // Create student mutation
-  const createStudentMutation = useMutation({
-    mutationFn: (data: FormValues) => {
-      return api.post<{ success: boolean; data: Student }>('/students', {
-        ...data,
-        department: user?.department
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-      setIsEditDialogOpen(false);
-      form.reset();
-      toast({
-        title: "Student Added",
-        description: "The student has been added to your supervision list",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add student",
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Update student mutation
-  const updateStudentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: FormValues }) => {
-      return api.put<{ success: boolean; data: Student }>(`/students/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-      setIsEditDialogOpen(false);
-      setCurrentStudent(null);
-      form.reset();
-      toast({
-        title: "Student Updated",
-        description: "The student information has been updated",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update student",
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Delete student mutation
-  const deleteStudentMutation = useMutation({
-    mutationFn: (id: string) => {
-      return api.delete(`/students/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-      setStudentToDelete(null);
-      toast({
-        title: "Student Removed",
-        description: "The student has been removed from your supervision list",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to remove student",
-        variant: "destructive",
-      });
-    }
-  });
+    });
+  };
 
-  const handleImportSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-    setImportModalOpen(false);
-    toast({
-      title: "Import Successful",
-      description: "Students have been successfully imported",
-    });
+  const handleFileUpload = (formData: FormData) => {
+    importStudentsMutation.mutate(formData);
   };
-  
-  const handleEditClick = (student: Student) => {
-    setCurrentStudent(student);
-    form.reset({
-      firstName: student.firstName,
-      lastName: student.lastName,
-      inscrNumber: student.inscrNumber,
-      email: student.email || "",
-      field: student.field || "",
-      subject: student.subject || "",
-    });
-    setIsEditDialogOpen(true);
-  };
-  
-  const handleAddNewClick = () => {
-    setCurrentStudent(null);
-    form.reset();
-    setIsEditDialogOpen(true);
-  };
-  
-  const handleDeleteClick = (student: Student) => {
-    setStudentToDelete(student);
-  };
-  
-  const onSubmit = (values: FormValues) => {
-    if (currentStudent) {
-      updateStudentMutation.mutate({ id: currentStudent.id, data: values });
-    } else {
-      createStudentMutation.mutate(values);
-    }
-  };
-  
-  const students = studentsResponse?.data || [];
-  
+
   return (
-    <div className="py-6 space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-navy">Student Supervision</h1>
-        
-        <div className="flex gap-4">
-          <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Import Students
-          </Button>
-          <Button onClick={handleAddNewClick}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Student
-          </Button>
+        <div className="flex gap-2">
+          <Dialog open={newStudentDialogOpen} onOpenChange={setNewStudentDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Student</DialogTitle>
+                <DialogDescription>
+                  Enter the student's information to add them to your supervision.
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleAddStudent}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="inscrNumber">Inscription Number</Label>
+                    <Input
+                      id="inscrNumber"
+                      name="inscrNumber"
+                      value={formData.inscrNumber}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="field">Field of Study (Optional)</Label>
+                    <Input
+                      id="field"
+                      name="field"
+                      value={formData.field}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subject">Subject (Optional)</Label>
+                    <Textarea
+                      id="subject"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setNewStudentDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">Add Student</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
-      
-      <Card className="p-4">
+
+      <div className="mb-4">
         <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input
-            placeholder="Search students by name or inscription number..."
-            className="pl-8 max-w-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            placeholder="Search students by name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-      </Card>
-      
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Inscription Number</TableHead>
-              <TableHead>Field</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">Loading students...</TableCell>
-              </TableRow>
-            ) : students.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">
-                  No students under your supervision yet
-                </TableCell>
-              </TableRow>
-            ) : (
-              students.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell className="font-medium">
-                    {student.firstName} {student.lastName}
-                  </TableCell>
-                  <TableCell>{student.inscrNumber}</TableCell>
-                  <TableCell>{student.field || "-"}</TableCell>
-                  <TableCell>{student.subject || "-"}</TableCell>
-                  <TableCell>{student.email || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditClick(student)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => handleDeleteClick(student)}
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
-      
-      {/* Student Form Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+      </div>
+
+      <Tabs defaultValue="list">
+        <TabsList>
+          <TabsTrigger value="list">Student List</TabsTrigger>
+          <TabsTrigger value="import">Import Students</TabsTrigger>
+        </TabsList>
+        <TabsContent value="list">
+          <Card>
+            <CardHeader>
+              <CardTitle>Supervised Students</CardTitle>
+              <CardDescription>
+                Manage the students under your supervision. You can add, edit, or remove students.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="text-center py-8">Loading students...</div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? "No students match your search" : "No students under your supervision yet"}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Inscription Number</TableHead>
+                      <TableHead>Field</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.map((student) => (
+                      <TableRow key={student._id || student.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{student.firstName} {student.lastName}</div>
+                            <div className="text-sm text-muted-foreground">{student.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{student.inscrNumber}</TableCell>
+                        <TableCell>{student.field || "-"}</TableCell>
+                        <TableCell>
+                          <div className="max-w-[250px] truncate">
+                            {student.subject || "-"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditStudent(student)}
+                            >
+                              <FileEdit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteStudent(student._id || student.id || "")}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="import">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Students</CardTitle>
+              <CardDescription>
+                Upload an Excel file with student data to import multiple students at once.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ExcelImport
+                onFileUpload={handleFileUpload}
+                acceptedFileTypes={".xlsx,.xls"}
+                uploadEndpoint="/import/students"
+                requiredColumns={["firstName", "lastName", "inscrNumber"]}
+                optionalColumns={["email", "field", "subject"]}
+                sampleFormat={{
+                  firstName: "John",
+                  lastName: "Doe",
+                  inscrNumber: "123456",
+                  email: "john.doe@example.com",
+                  field: "Computer Science",
+                  subject: "Machine Learning Algorithms",
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={editStudentDialogOpen} onOpenChange={setEditStudentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {currentStudent ? "Edit Student" : "Add New Student"}
-            </DialogTitle>
+            <DialogTitle>Edit Student Information</DialogTitle>
             <DialogDescription>
-              {currentStudent
-                ? "Update the student's information"
-                : "Add a new student to your supervision list"}
+              Update the student's information below.
             </DialogDescription>
           </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name*</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name*</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
+          <form onSubmit={handleUpdateStudent}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
+
+              <div className="space-y-2">
+                <Label htmlFor="inscrNumber">Inscription Number</Label>
+                <Input
+                  id="inscrNumber"
                   name="inscrNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Inscription Number*</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={formData.inscrNumber}
+                  onChange={handleInputChange}
+                  required
                 />
-                
-                <FormField
-                  control={form.control}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (Optional)</Label>
+                <Input
+                  id="email"
                   name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  type="email"
+                  value={formData.email || ""}
+                  onChange={handleInputChange}
                 />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
+
+              <div className="space-y-2">
+                <Label htmlFor="field">Field of Study (Optional)</Label>
+                <Input
+                  id="field"
                   name="field"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Field</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subject</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  value={formData.field || ""}
+                  onChange={handleInputChange}
                 />
               </div>
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {currentStudent ? "Save Changes" : "Add Student"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+
+              <div className="space-y-2">
+                <Label htmlFor="subject">Subject (Optional)</Label>
+                <Textarea
+                  id="subject"
+                  name="subject"
+                  value={formData.subject || ""}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditStudentDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Student</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!studentToDelete} onOpenChange={(open) => !open && setStudentToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Student</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {studentToDelete?.firstName} {studentToDelete?.lastName} from your supervision list?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => studentToDelete?._id && deleteStudentMutation.mutate(studentToDelete._id)}
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      {/* Import Modal */}
-      {importModalOpen && (
-        <ExcelImport 
-          title="Import Students"
-          endpoint="/import/students"
-          description="Import students from Excel file. The template should contain columns for: firstName, lastName, inscrNumber, subject, field"
-          successMessage="Students have been successfully imported"
-          errorMessage="Failed to import students"
-          onSuccess={handleImportSuccess}
-          templateUrl="/templates/students_template.xlsx"
-        />
-      )}
     </div>
   );
 };
