@@ -1,7 +1,4 @@
 
-// This fixes build errors in ScheduleManagement.tsx
-// Make sure to apply only necessary changes to fix the error with data property access and arguments
-// While maintaining the rest of the file's functionality
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/utils/api';

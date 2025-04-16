@@ -67,7 +67,8 @@ const TeachersList: React.FC = () => {
       if (selectedStatus !== 'all') params.status = selectedStatus;
       
       return api.get<{ success: boolean; data: Teacher[] }>('/teachers', { params });
-    }
+    },
+    enabled: true
   });
 
   const deleteMutation = useMutation({
@@ -186,10 +187,11 @@ const TeachersList: React.FC = () => {
               teachers.map((teacher) => (
                 <TableRow key={teacher._id}>
                   <TableCell className="font-medium">
-                    {teacher.firstName} {teacher.lastName}
+                    {/* Add safe checks for firstName and lastName */}
+                    {(teacher.firstName || '') + ' ' + (teacher.lastName || '')}
                   </TableCell>
-                  <TableCell>{teacher.email}</TableCell>
-                  <TableCell>{teacher.department}</TableCell>
+                  <TableCell>{teacher.email || 'No email'}</TableCell>
+                  <TableCell>{teacher.department || 'N/A'}</TableCell>
                   <TableCell>
                     <Badge variant="outline" 
                       className={teacher.status === 'active' ? 
@@ -197,7 +199,8 @@ const TeachersList: React.FC = () => {
                         'bg-gray-100 text-gray-800 hover:bg-gray-200'
                       }
                     >
-                      {teacher.status.charAt(0).toUpperCase() + teacher.status.slice(1)}
+                      {/* Add safe check for status with default value */}
+                      {teacher.status ? (teacher.status.charAt(0).toUpperCase() + teacher.status.slice(1)) : 'Unknown'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -230,7 +233,7 @@ const TeachersList: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the teacher "{teacherToDelete?.firstName} {teacherToDelete?.lastName}". This action cannot be undone.
+              This will permanently delete the teacher "{teacherToDelete?.firstName || ''} {teacherToDelete?.lastName || ''}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
