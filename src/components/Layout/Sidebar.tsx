@@ -39,6 +39,7 @@ const Sidebar: React.FC = () => {
       departmentHead: [
         { to: "/topics", icon: <BookOpen className="h-5 w-5" />, text: "PFE Topics" },
         { to: "/teachers", icon: <School className="h-5 w-5" />, text: "Teachers" },
+        { to: "/classrooms", icon: <Building2 className="h-5 w-5" />, text: "Classrooms" },
         { to: "/juries", icon: <Users className="h-5 w-5" />, text: "Jury Assignment" },
         { to: "/schedule", icon: <Calendar className="h-5 w-5" />, text: "Schedule" },
         { to: "/data-import", icon: <Upload className="h-5 w-5" />, text: "Import Data" },
