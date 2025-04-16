@@ -3,6 +3,7 @@ const express = require('express');
 const { upload } = require('../utils/fileUtils');
 const { importTopics } = require('../controllers/topicImportController');
 const { importTeachers } = require('../controllers/teacherImportController');
+const { importStudents } = require('../controllers/studentImportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -14,17 +15,7 @@ router.use(protect);
 router.post(
   '/topics',
   authorize('admin', 'departmentHead'),
-  (req, res, next) => {
-    upload(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          error: err.message
-        });
-      }
-      next();
-    });
-  },
+  upload,
   importTopics
 );
 
@@ -32,8 +23,16 @@ router.post(
 router.post(
   '/teachers',
   authorize('admin', 'departmentHead'),
-  upload, // Directly use multer middleware
+  upload,
   importTeachers
+);
+
+// Import students route
+router.post(
+  '/students',
+  authorize('admin', 'departmentHead', 'teacher'),
+  upload,
+  importStudents
 );
 
 module.exports = router;

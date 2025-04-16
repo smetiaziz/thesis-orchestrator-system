@@ -16,12 +16,16 @@ import Departments from "./pages/Admin/Departments";
 import DataImport from "./pages/Admin/DataImport";
 import DepartmentHeadDashboard from "./pages/DepartmentHead/Dashboard";
 import TopicManagement from "./pages/DepartmentHead/TopicManagement";
+import ClassroomManagement from "./pages/DepartmentHead/ClassroomManagement";
 import JuryAssignment from "./pages/DepartmentHead/JuryAssignment";
 import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement";
 import ParticipationTracker from "./pages/DepartmentHead/ParticipationTracker";
+import TeacherDashboard from "./pages/Teacher/Dashboard";
 import TeachersList from "./pages/Admin/TeachersList";
 import NewTeacher from "./pages/Admin/NewTeacher";
 import EditTeacher from "./pages/Admin/EditTeacher";
+import StudentSupervision from "./pages/Teacher/StudentSupervision";
+import ParticipationView from "./pages/Teacher/ParticipationView";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,16 +106,31 @@ const App = () => (
               }
             />
             
-            <Route
-              path="/admin/teachers"
-              element={
-                <AppLayout allowedRoles={["admin", "departmentHead"]}>
-                  <TeachersList />
-                </AppLayout>
-              }
-            >
-              <Route path="new" element={<NewTeacher />} />
-              <Route path=":id/edit" element={<EditTeacher />} />
+            <Route path="/admin/teachers">
+              <Route
+                path=""
+                element={
+                  <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                    <TeachersList />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path="new"
+                element={
+                  <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                    <NewTeacher />
+                  </AppLayout>
+                }
+              />
+              <Route
+                path=":id/edit"
+                element={
+                  <AppLayout allowedRoles={["admin", "departmentHead"]}>
+                    <EditTeacher />
+                  </AppLayout>
+                }
+              />
             </Route>
             
             {/* Department Head routes */}
@@ -129,6 +148,15 @@ const App = () => (
               element={
                 <AppLayout allowedRoles={["departmentHead", "admin"]}>
                   <TopicManagement />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/classrooms"
+              element={
+                <AppLayout allowedRoles={["departmentHead", "admin"]}>
+                  <ClassroomManagement />
                 </AppLayout>
               }
             />
@@ -198,6 +226,24 @@ const App = () => (
             
             {/* Teacher routes */}
             <Route
+              path="/teacher-dashboard"
+              element={
+                <AppLayout allowedRoles={["teacher"]}>
+                  <TeacherDashboard />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/student-supervision"
+              element={
+                <AppLayout allowedRoles={["teacher"]}>
+                  <StudentSupervision />
+                </AppLayout>
+              }
+            />
+            
+            <Route
               path="/presentations"
               element={
                 <AppLayout allowedRoles={["teacher"]}>
@@ -211,6 +257,15 @@ const App = () => (
               element={
                 <AppLayout allowedRoles={["teacher"]}>
                   <Dashboard />
+                </AppLayout>
+              }
+            />
+            
+            <Route
+              path="/teacher-participation"
+              element={
+                <AppLayout allowedRoles={["teacher"]}>
+                  <ParticipationView />
                 </AppLayout>
               }
             />

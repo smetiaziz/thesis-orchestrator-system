@@ -8,6 +8,7 @@ const {
   deleteJury,
   getScheduledDates
 } = require('../controllers/juryController');
+const { autoGenerateJuries } = require('../controllers/juryAutoController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { check } = require('express-validator');
 
@@ -39,6 +40,13 @@ router
 router
   .route('/scheduled-dates')
   .get(getScheduledDates);
+
+router
+  .route('/auto-generate')
+  .post(
+    authorize('admin', 'departmentHead'),
+    autoGenerateJuries
+  );
 
 router
   .route('/:id')

@@ -45,3 +45,28 @@ export interface Teacher {
   supervisedProjects?: string[];
   juryParticipations?: string[];
 }
+
+export interface Classroom {
+  id: string;
+  name: string;
+  building: string;
+  capacity: number;
+  department: string;
+  hasProjector: boolean;
+  hasComputers: boolean;
+  notes?: string;
+}
+
+export interface Student {
+  id: string;
+  userId?: string;
+  firstName: string;
+  lastName: string;
+  inscrNumber: string;
+  email?: string;
+  department: string;
+  field?: string;
+  subject?: string;
+  supervisorId?: string;
+  pfeTopicId?: string;
+}

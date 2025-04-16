@@ -17,15 +17,15 @@ exports.importTopics = async (req, res, next) => {
 
     const data = readExcelFile(req.file.path);
     
-    if (!data.length) {
+    if (!data || !Array.isArray(data) || data.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Excel file is empty'
+        error: 'Please provide valid topics data'
       });
     }
 
     // Validate required columns
-    const requiredColumns = ['topicName', 'studentName', 'supervisorId', 'department'];
+    const requiredColumns = ['topicName', 'studentName', 'supervisorEmail', 'department'];
     const firstRow = data[0];
     const missingColumns = requiredColumns.filter(col => !(col in firstRow));
     
@@ -45,23 +45,13 @@ exports.importTopics = async (req, res, next) => {
 
     for (const row of data) {
       try {
-        // Find supervisor by ID or create a mapping for them
-        let supervisorId = row.supervisorId;
-        let supervisorName = row.supervisorName;
+        // Find supervisor by email
+        let supervisor = await Teacher.findOne({ email: row.supervisorEmail });
         
-        if (!supervisorId && row.supervisorEmail) {
-          // Try to find supervisor by email
-          const supervisor = await Teacher.findOne({ email: row.supervisorEmail });
-          if (supervisor) {
-            supervisorId = supervisor._id;
-            supervisorName = `${supervisor.firstName} ${supervisor.lastName}`;
-          }
-        }
-        
-        if (!supervisorId) {
+        if (!supervisor) {
           importResults.errors.push({
             row: row.topicName,
-            error: 'Supervisor ID or email is required'
+            error: `Supervisor with email ${row.supervisorEmail} not found`
           });
           continue;
         }
@@ -75,8 +65,8 @@ exports.importTopics = async (req, res, next) => {
         if (existingTopic) {
           // Update existing topic
           await PFETopic.findByIdAndUpdate(existingTopic._id, {
-            supervisorId: supervisorId,
-            supervisorName: supervisorName || row.supervisorName,
+            supervisorId: supervisor._id,
+            supervisorName: `${supervisor.firstName} ${supervisor.lastName}`,
             department: row.department,
             studentEmail: row.studentEmail || existingTopic.studentEmail,
             status: row.status || existingTopic.status
@@ -87,15 +77,15 @@ exports.importTopics = async (req, res, next) => {
             topicName: row.topicName,
             studentName: row.studentName,
             studentEmail: row.studentEmail,
-            supervisorId: supervisorId,
-            supervisorName: supervisorName || row.supervisorName,
+            supervisorId: supervisor._id,
+            supervisorName: `${supervisor.firstName} ${supervisor.lastName}`,
             department: row.department,
             status: row.status || 'pending'
           });
           
           // Update teacher's supervisedProjects
           await Teacher.findByIdAndUpdate(
-            supervisorId,
+            supervisor._id,
             { $addToSet: { supervisedProjects: newTopic._id } }
           );
         }

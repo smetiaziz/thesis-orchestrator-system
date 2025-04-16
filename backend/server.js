@@ -1,101 +1,73 @@
 
 const express = require('express');
 const dotenv = require('dotenv');
+const colors = require('colors');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const path = require('path');
 
-// Load environment variables
-dotenv.config();
+// Load env vars
+dotenv.config({ path: './.env' });
 
 // Connect to database
 connectDB();
 
+// Route files
+const auth = require('./routes/authRoutes');
+const users = require('./routes/userRoutes');
+const departments = require('./routes/departmentRoutes');
+const teachers = require('./routes/teacherRoutes');
+const topics = require('./routes/topicRoutes');
+const juries = require('./routes/juryRoutes');
+const imports = require('./routes/importRoutes');
+const stats = require('./routes/statsRoutes');
+const timeSlots = require('./routes/timeSlotRoutes');
+const classrooms = require('./routes/classroomRoutes');
+const students = require('./routes/studentRoutes');
+
 const app = express();
+
+// CORS
+app.use(cors());
 
 // Body parser
 app.use(express.json());
 
-// Enable CORS
-app.use(cors());
+// File uploads folder
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Import routes
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const departmentRoutes = require('./routes/departmentRoutes');
-const teacherRoutes = require('./routes/teacherRoutes');
-const topicRoutes = require('./routes/topicRoutes');
-const juryRoutes = require('./routes/juryRoutes');
-const timeSlotRoutes = require('./routes/timeSlotRoutes');
-const importRoutes = require('./routes/importRoutes');
-const statsRoutes = require('./routes/statsRoutes');
+// Mount routers
+app.use('/api/auth', auth);
+app.use('/api/users', users);
+app.use('/api/departments', departments);
+app.use('/api/teachers', teachers);
+app.use('/api/topics', topics);
+app.use('/api/juries', juries);
+app.use('/api/import', imports);
+app.use('/api/stats', stats);
+app.use('/api/timeslots', timeSlots);
+app.use('/api/classrooms', classrooms);
+app.use('/api/students', students);
 
-// Mount routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/teachers', teacherRoutes);
-app.use('/api/topics', topicRoutes);
-app.use('/api/juries', juryRoutes);
-app.use('/api/timeslots', timeSlotRoutes);
-app.use('/api/import', importRoutes);
-app.use('/api/stats', statsRoutes);
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
 
-// Create default department head account if it doesn't exist
-const User = require('./models/User');
-const Department = require('./models/Department');
-
-const createDefaultDepartmentHead = async () => {
-  try {
-    // Check if department head exists
-    const existingUser = await User.findOne({ email: 'depthead@example.com' });
-    
-    if (!existingUser) {
-      console.log('Creating default department head account...');
-      
-      // Create department head user
-      const user = await User.create({
-        firstName: 'Department',
-        lastName: 'Head',
-        email: 'depthead@example.com',
-        password: 'password123', // This should be changed in production
-        role: 'departmentHead',
-        department: 'Computer Science'
-      });
-      
-      // Check if department exists or create it
-      let department = await Department.findOne({ name: 'Computer Science' });
-      
-      if (!department) {
-        department = await Department.create({
-          name: 'Computer Science',
-          headId: user._id
-        });
-      } else {
-        // Update department with head ID if it exists but has no head
-        if (!department.headId) {
-          department.headId = user._id;
-          await department.save();
-        }
-      }
-      
-      console.log('Default department head account created:');
-      console.log('Email: depthead@example.com');
-      console.log('Password: password123');
-    }
-  } catch (err) {
-    console.error('Error creating default department head:', err);
-  }
-};
-
-// Call the function
-createDefaultDepartmentHead();
-
-// Error handler middleware
+// Error handler
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(
+  PORT,
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold)
+);
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.log(`Error: ${err.message}`.red);
+  // Close server & exit process
+  server.close(() => process.exit(1));
 });

@@ -4,115 +4,108 @@ const Teacher = require('../models/Teacher');
 const Jury = require('../models/Jury');
 const TimeSlot = require('../models/TimeSlot');
 
-// @desc    Get department dashboard statistics
-// @route   GET /api/stats/department/:departmentName
+// @desc    Get department dashboard stats
+// @route   GET /api/stats/department/:department
 // @access  Private (Admin, Department Head)
 exports.getDepartmentStats = async (req, res, next) => {
   try {
-    const { departmentName } = req.params;
+    const department = req.params.department;
     
-    // Get total topics
-    const totalTopics = await PFETopic.countDocuments({ department: departmentName });
+    if (!department) {
+      return res.status(400).json({
+        success: false,
+        error: 'Department is required'
+      });
+    }
     
-    // Get scheduled presentations
+    // Get total topics count
+    const totalTopics = await PFETopic.countDocuments({ department });
+    
+    // Get scheduled presentations count
     const scheduledPresentations = await PFETopic.countDocuments({ 
-      department: departmentName,
+      department,
       status: 'scheduled'
     });
     
-    // Get pending presentations
+    // Get pending presentations count
     const pendingPresentations = await PFETopic.countDocuments({ 
-      department: departmentName,
+      department,
       status: 'pending'
     });
     
-    // Get total teachers
-    const totalTeachers = await Teacher.countDocuments({ department: departmentName });
+    // Get total teachers count
+    const totalTeachers = await Teacher.countDocuments({ department });
     
-    // Get teachers without availability
+    // Get teachers without availability data
     const teachersWithAvailability = await TimeSlot.distinct('teacherId');
-    const allTeacherIds = await Teacher.distinct('_id', { department: departmentName });
-    
-    const teachersWithoutAvailability = allTeacherIds.filter(
-      teacherId => !teachersWithAvailability.some(id => id.equals(teacherId))
+    const allTeachers = await Teacher.find({ department }).select('_id');
+    const teacherIds = allTeachers.map(teacher => teacher._id.toString());
+    const teachersWithoutAvailability = teacherIds.filter(
+      id => !teachersWithAvailability.map(id => id.toString()).includes(id)
     ).length;
     
-    // Get scheduling conflicts
-    const juries = await Jury.find({})
-      .populate({
-        path: 'pfeTopicId',
-        match: { department: departmentName }
-      })
-      .populate('supervisorId')
-      .populate('presidentId')
-      .populate('reporterId');
-    
-    // Filter out juries from other departments
-    const departmentJuries = juries.filter(jury => jury.pfeTopicId);
-    
     // Check for scheduling conflicts
+    const juries = await Jury.find({
+      date: { $gte: new Date() }
+    }).populate('pfeTopicId');
+    
+    const juriesByDepartment = juries.filter(
+      jury => jury.pfeTopicId && jury.pfeTopicId.department === department
+    );
+    
+    const teacherSchedules = {};
     let schedulingConflicts = 0;
     
-    for (let i = 0; i < departmentJuries.length; i++) {
-      const jury1 = departmentJuries[i];
+    for (const jury of juriesByDepartment) {
+      const date = jury.date.toISOString().split('T')[0];
+      const teachers = [jury.supervisorId, jury.presidentId, jury.reporterId].map(id => id.toString());
       
-      for (let j = i + 1; j < departmentJuries.length; j++) {
-        const jury2 = departmentJuries[j];
-        
-        // Skip if not on the same date
-        if (jury1.date.toDateString() !== jury2.date.toDateString()) {
-          continue;
+      for (const teacherId of teachers) {
+        if (!teacherSchedules[teacherId]) {
+          teacherSchedules[teacherId] = {};
         }
         
-        // Check for time overlap
-        const jury1Start = jury1.startTime;
-        const jury1End = jury1.endTime;
-        const jury2Start = jury2.startTime;
-        const jury2End = jury2.endTime;
+        if (!teacherSchedules[teacherId][date]) {
+          teacherSchedules[teacherId][date] = [];
+        }
         
-        if (jury1Start < jury2End && jury1End > jury2Start) {
-          // Check for same faculty member in both juries
-          const jury1Teachers = [
-            jury1.supervisorId._id.toString(),
-            jury1.presidentId._id.toString(),
-            jury1.reporterId._id.toString()
-          ];
-          
-          const jury2Teachers = [
-            jury2.supervisorId._id.toString(),
-            jury2.presidentId._id.toString(),
-            jury2.reporterId._id.toString()
-          ];
-          
-          const commonTeachers = jury1Teachers.filter(teacher => jury2Teachers.includes(teacher));
-          
-          if (commonTeachers.length > 0) {
+        const timeRange = {
+          start: jury.startTime,
+          end: jury.endTime,
+          juryId: jury._id
+        };
+        
+        // Check for conflicts with existing schedules
+        for (const existing of teacherSchedules[teacherId][date]) {
+          if (
+            (timeRange.start >= existing.start && timeRange.start < existing.end) ||
+            (timeRange.end > existing.start && timeRange.end <= existing.end) ||
+            (timeRange.start <= existing.start && timeRange.end >= existing.end)
+          ) {
             schedulingConflicts++;
-            break; // Count each jury with conflict only once
+            break;
           }
         }
+        
+        teacherSchedules[teacherId][date].push(timeRange);
       }
     }
     
-    // Get upcoming presentations (next 7 days)
+    // Get upcoming presentations
     const today = new Date();
-    const nextWeek = new Date();
-    nextWeek.setDate(today.getDate() + 7);
-    
-    const upcomingJuries = await Jury.find({
-      date: { $gte: today, $lte: nextWeek }
+    const upcomingPresentations = await Jury.find({
+      date: { $gte: today }
     })
-    .populate({
-      path: 'pfeTopicId',
-      match: { department: departmentName },
-      select: 'topicName studentName'
-    })
-    .sort({ date: 1, startTime: 1 })
-    .limit(5);
+      .populate('pfeTopicId')
+      .populate('supervisorId', 'firstName lastName')
+      .populate('presidentId', 'firstName lastName')
+      .populate('reporterId', 'firstName lastName')
+      .sort({ date: 1, startTime: 1 })
+      .limit(5);
     
-    // Filter out juries from other departments and format the result
-    const upcomingPresentations = upcomingJuries
-      .filter(jury => jury.pfeTopicId)
+    // Filter presentations for this department
+    const filteredPresentations = upcomingPresentations
+      .filter(jury => jury.pfeTopicId && jury.pfeTopicId.department === department)
       .map(jury => ({
         _id: jury._id,
         topicName: jury.pfeTopicId.topicName,
@@ -131,7 +124,7 @@ exports.getDepartmentStats = async (req, res, next) => {
         totalTeachers,
         teachersWithoutAvailability,
         schedulingConflicts,
-        upcomingPresentations
+        upcomingPresentations: filteredPresentations
       }
     });
   } catch (err) {
