@@ -16,6 +16,7 @@ import Departments from "./pages/Admin/Departments";
 import DataImport from "./pages/Admin/DataImport";
 import DepartmentHeadDashboard from "./pages/DepartmentHead/Dashboard";
 import TopicManagement from "./pages/DepartmentHead/TopicManagement";
+import NewTopic from "./pages/DepartmentHead/NewTopic";
 import ClassroomManagement from "./pages/DepartmentHead/ClassroomManagement";
 import JuryAssignment from "./pages/DepartmentHead/JuryAssignment";
 import ScheduleManagement from "./pages/DepartmentHead/ScheduleManagement";
@@ -164,7 +165,7 @@ const App = () => (
             path="/topics/new"
             element={
               <AppLayout allowedRoles={["departmentHead", "admin"]}>
-                <Dashboard />
+                <NewTopic />
               </AppLayout>
             }
           />

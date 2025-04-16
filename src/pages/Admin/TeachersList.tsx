@@ -61,14 +61,12 @@ const TeachersList: React.FC = () => {
   const { data: teachersResponse, isLoading } = useQuery({
     queryKey: ['teachers', searchTerm, selectedDepartment, selectedStatus],
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: Teacher[] }>('/teachers', {
-        params: {
-          search: searchTerm,
-          department: selectedDepartment,
-          status: selectedStatus !== 'all' ? selectedStatus : undefined
-        }
-      });
-      return response.data;
+      const params: Record<string, string> = {};
+      if (searchTerm) params.search = searchTerm;
+      if (selectedDepartment) params.department = selectedDepartment;
+      if (selectedStatus !== 'all') params.status = selectedStatus;
+      
+      return api.get<{ success: boolean; data: Teacher[] }>('/teachers', { params });
     }
   });
 
@@ -102,6 +100,7 @@ const TeachersList: React.FC = () => {
     });
   };
 
+  // Fix the data extraction from the response
   const teachers = teachersResponse?.data || [];
 
   return (
@@ -252,6 +251,8 @@ const TeachersList: React.FC = () => {
           title="Import Teachers"
           endpoint="/teachers/import"
           description="Import teachers from Excel file. The template should contain columns for teacher details."
+          successMessage="Teachers have been successfully imported"
+          errorMessage="Failed to import teachers"
           onSuccess={handleImportSuccess}
           templateUrl="/templates/teachers_template.xlsx"
         />
