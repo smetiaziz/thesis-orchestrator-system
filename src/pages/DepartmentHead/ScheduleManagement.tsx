@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/utils/api';
 import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from '@/components/ui/use-toast';
+import { RefreshCw } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Jury {
   _id: string;
@@ -20,12 +22,23 @@ interface Jury {
   members: string[];
 }
 
+interface AutoGenerateResponse {
+  success: boolean;
+  data: {
+    total: number;
+    scheduled: number;
+    failed: number;
+    errors: string[];
+  };
+}
+
 const ScheduleManagement: React.FC = () => {
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   
   // Fetch juries with presentations on the selected date
-  const { data: juriesResponse, isLoading: loadingJuries } = useQuery({
+  const { data: juriesResponse, isLoading: loadingJuries, refetch: refetchJuries } = useQuery({
     queryKey: ['juries', formattedDate],
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: Jury[] }>(`/juries/date/${formattedDate}`);
@@ -42,6 +55,55 @@ const ScheduleManagement: React.FC = () => {
       return response.data;
     },
   });
+
+  // Auto-generate mutation
+  const autoGenerateMutation = useMutation({
+    mutationFn: async () => {
+      const department = user?.department;
+      const response = await api.post<AutoGenerateResponse>('/juries/auto-generate', null, { params: { department } });
+      return response;
+    },
+    onSuccess: (response) => {
+      const { total, scheduled, failed, errors } = response.data;
+      
+      if (scheduled > 0) {
+        toast({
+          title: "Schedule Generated",
+          description: `Successfully scheduled ${scheduled} out of ${total} presentations. ${failed > 0 ? `Failed: ${failed}` : ''}`,
+          variant: failed > 0 ? "destructive" : "default",
+        });
+        
+        // Refresh the juries list
+        refetchJuries();
+      } else {
+        toast({
+          title: "No Presentations Scheduled",
+          description: "Could not schedule any presentations. Please check teacher availability and classroom assignments.",
+          variant: "destructive",
+        });
+      }
+      
+      // Show errors if any
+      errors.forEach(error => {
+        toast({
+          title: "Error",
+          description: error,
+          variant: "destructive",
+        });
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate schedule. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAutoGenerate = () => {
+    autoGenerateMutation.mutate();
+  };
   
   const handleSetClassroom = async (juryId: string, classroom: string) => {
     try {
@@ -64,7 +126,17 @@ const ScheduleManagement: React.FC = () => {
   
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Presentation Schedule</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Presentation Schedule</h1>
+        <Button
+          onClick={handleAutoGenerate}
+          disabled={autoGenerateMutation.isPending}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
+          Auto-Generate Schedule
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="p-4">
