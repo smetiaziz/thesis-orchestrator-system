@@ -49,10 +49,9 @@ exports.importTopics = async (req, res, next) => {
         let supervisor = await Teacher.findOne({ email: row.supervisorEmail });
         
         if (!supervisor) {
-          importResults.errors.push({
-            row: row.topicName,
-            error: `Supervisor with email ${row.supervisorEmail} not found`
-          });
+          importResults.errors.push(
+            `Supervisor with email ${row.supervisorEmail} not found for topic "${row.topicName}"`
+          );
           continue;
         }
 
@@ -92,10 +91,9 @@ exports.importTopics = async (req, res, next) => {
 
         importResults.imported++;
       } catch (error) {
-        importResults.errors.push({
-          row: row.topicName,
-          error: error.message
-        });
+        importResults.errors.push(
+          `Error with topic "${row.topicName}": ${error.message}`
+        );
       }
     }
 

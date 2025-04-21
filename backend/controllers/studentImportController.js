@@ -121,10 +121,9 @@ exports.importStudents = async (req, res, next) => {
 
         importResults.imported++;
       } catch (error) {
-        importResults.errors.push({
-          row: `${row.firstName} ${row.lastName}`,
-          error: error.message
-        });
+        importResults.errors.push(
+          `Error with student "${row.firstName} ${row.lastName}": ${error.message}`
+        );
       }
     }
 

@@ -137,6 +137,9 @@ const ExcelImport: React.FC<ExcelImportProps> = ({
                 {uploadResult.emailsSent && (
                   <p>Welcome emails sent: {uploadResult.emailsSent}</p>
                 )}
+                {uploadResult.emailsCreated && (
+                  <p>User accounts created: {uploadResult.emailsCreated}</p>
+                )}
                 {uploadResult.errors && uploadResult.errors.length > 0 && (
                   <p>With {uploadResult.errors.length} warnings/errors</p>
                 )}

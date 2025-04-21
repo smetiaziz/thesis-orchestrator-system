@@ -57,12 +57,24 @@ export const apiRequest = async <T>(
   endpoint: string, 
   method: string = 'GET', 
   data?: any, 
-  requireAuth: boolean = true
+  params?: Record<string, any>
 ): Promise<T> => {
-  const url = `${API_URL}${endpoint}`;
+  let url = `${API_URL}${endpoint}`;
+  
+  // Handle query parameters
+  if (params && Object.keys(params).length > 0) {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+    url = `${url}?${queryParams.toString()}`;
+  }
+
   const options: RequestInit = {
     method,
-    headers: getHeaders(requireAuth),
+    headers: getHeaders(true),
   };
 
   if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
@@ -86,18 +98,18 @@ export const apiRequest = async <T>(
 
 // API utility methods
 export const api = {
-  get: <T>(endpoint: string, requireAuth: boolean = true): Promise<T> => 
-    apiRequest<T>(endpoint, 'GET', undefined, requireAuth),
+  get: <T>(endpoint: string, params?: Record<string, any>): Promise<T> => 
+    apiRequest<T>(endpoint, 'GET', undefined, params),
     
-  post: <T>(endpoint: string, data: any, requireAuth: boolean = true): Promise<T> => 
-    apiRequest<T>(endpoint, 'POST', data, requireAuth),
+  post: <T>(endpoint: string, data: any, params?: Record<string, any>): Promise<T> => 
+    apiRequest<T>(endpoint, 'POST', data, params),
     
-  put: <T>(endpoint: string, data: any, requireAuth: boolean = true): Promise<T> => 
-    apiRequest<T>(endpoint, 'PUT', data, requireAuth),
+  put: <T>(endpoint: string, data: any, params?: Record<string, any>): Promise<T> => 
+    apiRequest<T>(endpoint, 'PUT', data, params),
     
-  patch: <T>(endpoint: string, data: any, requireAuth: boolean = true): Promise<T> => 
-    apiRequest<T>(endpoint, 'PATCH', data, requireAuth),
+  patch: <T>(endpoint: string, data: any, params?: Record<string, any>): Promise<T> => 
+    apiRequest<T>(endpoint, 'PATCH', data, params),
     
-  delete: <T>(endpoint: string, requireAuth: boolean = true): Promise<T> => 
-    apiRequest<T>(endpoint, 'DELETE', undefined, requireAuth),
+  delete: <T>(endpoint: string, params?: Record<string, any>): Promise<T> => 
+    apiRequest<T>(endpoint, 'DELETE', undefined, params),
 };
