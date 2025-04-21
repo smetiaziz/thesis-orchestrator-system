@@ -65,4 +65,11 @@ router
     deleteJury
   );
 
+router
+  .route('/:id/classroom')
+  .put(
+    authorize('admin', 'departmentHead'),
+    updateJury
+  );
+
 module.exports = router;

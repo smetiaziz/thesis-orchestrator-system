@@ -9,6 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { toast } from '@/components/ui/use-toast';
 import { RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import DepartmentSelector from '@/components/DepartmentSelector';
 
 interface Jury {
   _id: string;
@@ -35,6 +36,7 @@ interface AutoGenerateResponse {
 const ScheduleManagement: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   
   // Fetch juries with presentations on the selected date
@@ -61,13 +63,13 @@ const ScheduleManagement: React.FC = () => {
     mutationFn: async () => {
       const response = await api.post<AutoGenerateResponse>(
         '/juries/auto-generate',
-        { department: "computer science" } // <== body with static department
+        { department: selectedDepartment || "computer science" }
       );
   
       return response.data;
     },
     onSuccess: (response) => {
-      const { total, scheduled, failed, errors } = response;
+      const { total, scheduled, failed, errors } = response.data;
   
       if (scheduled > 0) {
         toast({
@@ -131,14 +133,23 @@ const ScheduleManagement: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Presentation Schedule</h1>
-        <Button
-          onClick={handleAutoGenerate}
-          disabled={autoGenerateMutation.isPending}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
-          Auto-Generate Schedule
-        </Button>
+        <div className="flex gap-2 items-center">
+          <div className="w-64">
+            <DepartmentSelector
+              value={selectedDepartment}
+              onValueChange={setSelectedDepartment}
+              placeholder="Select Department"
+            />
+          </div>
+          <Button
+            onClick={handleAutoGenerate}
+            disabled={autoGenerateMutation.isPending}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
+            Auto-Generate Schedule
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

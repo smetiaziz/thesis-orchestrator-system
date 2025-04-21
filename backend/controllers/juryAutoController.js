@@ -1,4 +1,3 @@
-
 const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
@@ -134,7 +133,8 @@ const findAvailableClassroom = async (department, date, startTime, endTime) => {
 // @access  Private (Admin, Department Head)
 exports.autoGenerateJuries = async (req, res, next) => {
   try {
-    const department = req.query.department || req.user.department;
+    // Get department from request body or user's department
+    const department = req.body.department || req.user.department;
     
     if (!department) {
       return res.status(400).json({
