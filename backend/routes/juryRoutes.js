@@ -6,7 +6,8 @@ const {
   createJury,
   updateJury,
   deleteJury,
-  getScheduledDates
+  getScheduledDates,
+  getJuriesByDate
 } = require('../controllers/juryController');
 const { autoGenerateJuries } = require('../controllers/juryAutoController');
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -40,6 +41,10 @@ router
 router
   .route('/scheduled-dates')
   .get(getScheduledDates);
+
+router
+  .route('/date/:date')
+  .get(getJuriesByDate);
 
 router
   .route('/auto-generate')

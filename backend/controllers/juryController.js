@@ -1,4 +1,3 @@
-
 const Jury = require('../models/Jury');
 const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
@@ -92,6 +91,55 @@ exports.getScheduledDates = async (req, res, next) => {
       success: true,
       count: formattedDates.length,
       data: formattedDates
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get juries for a specific date
+// @route   GET /api/juries/date/:date
+// @access  Private
+exports.getJuriesByDate = async (req, res, next) => {
+  try {
+    const dateParam = req.params.date;
+    if (!dateParam) {
+      return res.status(400).json({
+        success: false,
+        error: 'Date parameter is required'
+      });
+    }
+
+    // Create start and end date for the requested day
+    const startDate = new Date(`${dateParam}T00:00:00.000Z`);
+    const endDate = new Date(`${dateParam}T23:59:59.999Z`);
+
+    let query = Jury.find({
+      date: {
+        $gte: startDate,
+        $lt: endDate
+      }
+    });
+
+    // Filter by department (from PFE topic)
+    if (req.query.department) {
+      const topics = await PFETopic.find({ department: req.query.department }).select('_id');
+      const topicIds = topics.map(topic => topic._id);
+      query = query.find({ pfeTopicId: { $in: topicIds } });
+    }
+
+    query = query
+      .populate({
+        path: 'pfeTopicId',
+        select: 'topicName studentName'
+      })
+      .sort({ startTime: 1 });
+
+    const juries = await query;
+
+    res.status(200).json({
+      success: true,
+      data: juries
     });
   } catch (err) {
     next(err);

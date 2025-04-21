@@ -42,7 +42,7 @@ const ScheduleManagement: React.FC = () => {
     queryKey: ['juries', formattedDate],
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: Jury[] }>(`/juries/date/${formattedDate}`);
-      return response.data;
+      return response;
     },
     enabled: !!formattedDate,
   });
@@ -52,7 +52,7 @@ const ScheduleManagement: React.FC = () => {
     queryKey: ['classrooms'],
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: string[] }>('/classrooms');
-      return response.data;
+      return response;
     },
   });
 
@@ -60,8 +60,9 @@ const ScheduleManagement: React.FC = () => {
   const autoGenerateMutation = useMutation({
     mutationFn: async () => {
       const department = user?.department;
-      const response = await api.post<AutoGenerateResponse>('/juries/auto-generate', null, { params: { department } });
-      return response;
+      const params = department ? { department } : {};
+      const response = await api.post<AutoGenerateResponse>('/juries/auto-generate', null, params);
+      return response.data;
     },
     onSuccess: (response) => {
       const { total, scheduled, failed, errors } = response.data;
