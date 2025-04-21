@@ -1,3 +1,4 @@
+
 const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
@@ -52,26 +53,44 @@ const isTeacherAvailable = async (teacherId, date, startTime, endTime) => {
   return !hasSubmittedAvailability || availableSlot;
 };
 
-// Helper function to calculate teacher participation score
-// This helps ensure fair distribution of jury duties
-const calculateParticipationScore = (teacher) => {
-  const supervisedCount = teacher.supervisedProjects.length;
-  const juryCount = teacher.juryParticipations.length;
+// Helper function to calculate teacher participation score based on quota
+const calculateParticipationScore = async (teacher) => {
+  // Get supervised projects count
+  const supervisedCount = teacher.supervisedProjects?.length || 0;
   
-  // Ideal ratio is 3 jury participations for each supervised project
-  const idealJuryCount = supervisedCount * 3;
-  const participationDeficit = idealJuryCount - juryCount;
+  // Get existing jury participations
+  const juryParticipations = teacher.juryParticipations?.length || 0;
   
-  return participationDeficit;
+  // Count roles separately (president and reporter)
+  const presidentRoles = await Jury.countDocuments({ presidentId: teacher._id });
+  const reporterRoles = await Jury.countDocuments({ reporterId: teacher._id });
+  
+  // Calculate quotas
+  const totalRequiredParticipations = supervisedCount * 3; // 1 supervisor + 1 president + 1 reporter
+  const requiredPresidentRoles = supervisedCount;
+  const requiredReporterRoles = supervisedCount;
+  
+  // Calculate deficits (higher means more need to participate in this role)
+  const totalDeficit = Math.max(0, totalRequiredParticipations - juryParticipations);
+  const presidentDeficit = Math.max(0, requiredPresidentRoles - presidentRoles);
+  const reporterDeficit = Math.max(0, requiredReporterRoles - reporterRoles);
+  
+  return {
+    totalDeficit,
+    presidentDeficit,
+    reporterDeficit,
+    // Combined score - weighted to prioritize role balancing
+    score: totalDeficit * 2 + presidentDeficit * 3 + reporterDeficit * 3
+  };
 };
 
 // Helper function to find suitable teachers for jury roles
-const findSuitableTeachers = async (supervisorId, department, date, startTime, endTime, excludeIds = []) => {
+const findSuitableTeachers = async (role, supervisorId, department, date, startTime, endTime, excludeIds = []) => {
   // Get all teachers from the same department
   const teachers = await Teacher.find({ 
     department,
     _id: { $nin: [supervisorId, ...excludeIds] }
-  });
+  }).populate('supervisedProjects').populate('juryParticipations');
   
   // Filter available teachers and sort by participation score
   const availableTeachers = [];
@@ -80,16 +99,26 @@ const findSuitableTeachers = async (supervisorId, department, date, startTime, e
     const available = await isTeacherAvailable(teacher._id, date, startTime, endTime);
     
     if (available) {
-      const score = calculateParticipationScore(teacher);
+      const participationData = await calculateParticipationScore(teacher);
+      
+      // Adjust score based on role
+      let roleScore = participationData.score;
+      if (role === 'president') {
+        roleScore += participationData.presidentDeficit * 5; // Prioritize president deficit
+      } else if (role === 'reporter') {
+        roleScore += participationData.reporterDeficit * 5; // Prioritize reporter deficit
+      }
+      
       availableTeachers.push({
         teacher,
-        score
+        roleScore,
+        totalScore: participationData.score
       });
     }
   }
   
-  // Sort by participation score (higher deficit first)
-  availableTeachers.sort((a, b) => b.score - a.score);
+  // Sort by role-specific score (higher deficit first)
+  availableTeachers.sort((a, b) => b.roleScore - a.roleScore);
   
   return availableTeachers.map(item => item.teacher);
 };
@@ -165,10 +194,13 @@ exports.autoGenerateJuries = async (req, res, next) => {
     
     // Define default time slots (8 AM to 6 PM, 30 minute intervals)
     const defaultTimeSlots = [];
-    for (let day = 0; day < 5; day++) { // Monday to Friday
+    for (let day = 0; day < 10; day++) { // Extend to two weeks for more flexibility
       const date = new Date();
-      date.setDate(date.getDate() + ((day + 1) % 7) + 1); // Next week, starting Monday
+      date.setDate(date.getDate() + day + 1); // Starting tomorrow
       date.setHours(0, 0, 0, 0);
+      
+      // Skip weekends
+      if (date.getDay() === 0 || date.getDay() === 6) continue; 
       
       for (let hour = 8; hour < 18; hour++) {
         for (let minute = 0; minute < 60; minute += 30) {
@@ -188,8 +220,38 @@ exports.autoGenerateJuries = async (req, res, next) => {
       }
     }
     
+    // First load all teachers' current participation data
+    const departmentTeachers = await Teacher.find({ department })
+      .populate('supervisedProjects')
+      .populate('juryParticipations');
+      
+    // Sort topics by supervisor participation deficit to prioritize those who haven't met their quota
+    const topicsWithPriority = await Promise.all(pendingTopics.map(async (topic) => {
+      let supervisorScore = 0;
+      
+      // If topic has a supervisor, calculate their participation deficit
+      if (topic.supervisorId) {
+        const supervisor = departmentTeachers.find(
+          t => t._id.toString() === topic.supervisorId._id.toString()
+        );
+        
+        if (supervisor) {
+          const participationData = await calculateParticipationScore(supervisor);
+          supervisorScore = participationData.totalDeficit;
+        }
+      }
+      
+      return {
+        topic,
+        supervisorScore
+      };
+    }));
+    
+    // Sort by supervisor score (higher deficit first)
+    topicsWithPriority.sort((a, b) => b.supervisorScore - a.supervisorScore);
+    
     // Try to schedule each topic
-    for (const topic of pendingTopics) {
+    for (const { topic } of topicsWithPriority) {
       try {
         // Get the supervisor
         const supervisor = topic.supervisorId;
@@ -208,8 +270,9 @@ exports.autoGenerateJuries = async (req, res, next) => {
           
           if (!supervisorAvailable) continue;
           
-          // Find president
+          // Find president based on participation quota
           const presidents = await findSuitableTeachers(
+            'president',
             supervisor._id,
             department,
             slot.date,
@@ -220,8 +283,9 @@ exports.autoGenerateJuries = async (req, res, next) => {
           if (presidents.length === 0) continue;
           const president = presidents[0];
           
-          // Find reporter
+          // Find reporter based on participation quota
           const reporters = await findSuitableTeachers(
+            'reporter',
             supervisor._id,
             department,
             slot.date,
