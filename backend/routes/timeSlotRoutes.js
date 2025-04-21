@@ -25,16 +25,10 @@ const timeSlotValidation = [
 router
   .route('/')
   .get(getTimeSlots)
-  .post(
-    timeSlotValidation,
-    createTimeSlot
-  );
+  .post(timeSlotValidation, createTimeSlot);
 
-router
-  .route('/bulk')
-  .post(
-    bulkCreateTimeSlots
-  );
+// Add bulk create route
+router.post('/bulk', bulkCreateTimeSlots);
 
 router
   .route('/:id')

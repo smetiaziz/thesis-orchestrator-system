@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,6 +26,7 @@ import NewTeacher from "./pages/Admin/NewTeacher";
 import EditTeacher from "./pages/Admin/EditTeacher";
 import StudentSupervision from "./pages/Teacher/StudentSupervision";
 import ParticipationView from "./pages/Teacher/ParticipationView";
+import TeacherAvailability from "./pages/Teacher/TeacherAvailability";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -256,7 +256,7 @@ const App = () => (
             path="/availability"
             element={
               <AppLayout allowedRoles={["teacher"]}>
-                <Dashboard />
+                <TeacherAvailability />
               </AppLayout>
             }
           />
