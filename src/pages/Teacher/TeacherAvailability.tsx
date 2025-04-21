@@ -41,7 +41,7 @@ const TeacherAvailability = () => {
     newTimeSlots[index].selected = !newTimeSlots[index].selected;
     setSelectedTimeSlots(newTimeSlots);
   };
-
+  
   const handleSubmit = async () => {
     if (!selectedDate || !user?.id) {
       toast({
@@ -63,13 +63,14 @@ const TeacherAvailability = () => {
     }
 
     try {
+      console.log('user ', user)
       await api.post('/timeslots/bulk', {
         teacherId: user.id,
+        slots: selectedSlots.map(slot => ({
         date: format(selectedDate, 'yyyy-MM-dd'),
-        timeSlots: selectedSlots.map(slot => ({
-          startTime: slot.startTime,
-          endTime: slot.endTime
-        }))
+        startTime: slot.startTime + ":00", // Add seconds if needed
+        endTime: slot.endTime + ":00"
+      }))
       });
 
       toast({

@@ -191,9 +191,10 @@ exports.deleteTimeSlot = async (req, res, next) => {
 // @route   POST /api/timeslots/bulk
 // @access  Private
 exports.bulkCreateTimeSlots = async (req, res, next) => {
+  console.log(' successyffu')
   try {
     const { teacherId, slots } = req.body;
-    
+    console.log('teacher id', teacherId)
     if (!teacherId || !slots || !Array.isArray(slots) || slots.length === 0) {
       return res.status(400).json({
         success: false,
@@ -202,7 +203,10 @@ exports.bulkCreateTimeSlots = async (req, res, next) => {
     }
     
     // Check if teacher exists
-    const teacher = await Teacher.findById(teacherId);
+    const teacher = await Teacher.findOne({ userId: teacherId });
+    console.log('teacher ', teacher)
+    console.log('slots ', slots)
+
     if (!teacher) {
       return res.status(404).json({
         success: false,

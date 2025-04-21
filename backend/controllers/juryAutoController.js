@@ -4,7 +4,7 @@ const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
 const Jury = require('../models/Jury');
 const TimeSlot = require('../models/TimeSlot');
-
+const Department = require('../models/Department');
 // Helper function to check teacher availability
 const isTeacherAvailable = async (teacherId, date, startTime, endTime) => {
   // Convert date and times to a common format
@@ -37,6 +37,11 @@ const isTeacherAvailable = async (teacherId, date, startTime, endTime) => {
     return false;
   }
 
+  const availabilityCount = await TimeSlot.countDocuments({ teacherId });
+  if (availabilityCount === 0) {
+    // no availability data → default to “available”
+    return true;
+  }
   // Check if teacher has marked this time as available
   const availableSlot = await TimeSlot.findOne({
     teacherId,
@@ -85,13 +90,15 @@ const calculateParticipationScore = async (teacher) => {
 };
 
 // Helper function to find suitable teachers for jury roles
-const findSuitableTeachers = async (role, supervisorId, department, date, startTime, endTime, excludeIds = []) => {
+const findSuitableTeachers = async (role, supervisorId, departmentName, date, startTime, endTime, excludeIds = []) => {
   // Get all teachers from the same department
-  const teachers = await Teacher.find({ 
-    department,
+  const teachers = await Teacher  .find({
+    department: departmentName,
     _id: { $nin: [supervisorId, ...excludeIds] }
   }).populate('supervisedProjects').populate('juryParticipations');
-  
+
+  console.log("teachers in the findSuitableTeachers",teachers.length) 
+
   // Filter available teachers and sort by participation score
   const availableTeachers = [];
   
@@ -124,10 +131,10 @@ const findSuitableTeachers = async (role, supervisorId, department, date, startT
 };
 
 // Helper function to find available classroom
-const findAvailableClassroom = async (department, date, startTime, endTime) => {
+const findAvailableClassroom = async ( date, startTime, endTime) => {
   // Get all classrooms for this department
-  const classrooms = await Classroom.find({ department });
-  
+  const classrooms = await Classroom.find();
+  console.log("classrooms in findAvailableClassroom:", classrooms.length)
   // Check each classroom for availability
   for (const classroom of classrooms) {
     // Check if there's a jury scheduled at the same time in this classroom
@@ -162,23 +169,34 @@ const findAvailableClassroom = async (department, date, startTime, endTime) => {
 // @access  Private (Admin, Department Head)
 exports.autoGenerateJuries = async (req, res, next) => {
   try {
-    // Get department from request body or user's department
-    const department = req.body.department || req.user.department;
-    
+    console.log("[autoGenerateJuries] Invoked");
+
+    // Get department ID from request
+    const departmentId = req.body.department || req.user.department;
+    console.log("[autoGenerateJuries] Department ID:", departmentId);
+
+    // Get full department document
+    const department = await Department.findById(departmentId);
     if (!department) {
       return res.status(400).json({
         success: false,
-        error: 'Department is required'
+        error: 'Department not found'
       });
     }
     
+    const departmentName = department.name;
+    console.log("[autoGenerateJuries] Department Name:", departmentName);
     // Get all pending PFE topics for this department
+    console.log("[autoGenerateJuries] Fetching pending topics for department");
     const pendingTopics = await PFETopic.find({
-      department,
+      department: departmentName,
       status: 'pending'
     }).populate('supervisorId');
+    console.log("[autoGenerateJuries] Pending topics found:", pendingTopics.length);
     
+
     if (pendingTopics.length === 0) {
+      console.log("[autoGenerateJuries] No pending topics, returning 400");
       return res.status(400).json({
         success: false,
         error: 'No pending topics found for this department'
@@ -193,8 +211,9 @@ exports.autoGenerateJuries = async (req, res, next) => {
     };
     
     // Define default time slots (8 AM to 6 PM, 30 minute intervals)
+    console.log("[autoGenerateJuries] Generating default time slots");
     const defaultTimeSlots = [];
-    for (let day = 0; day < 10; day++) { // Extend to two weeks for more flexibility
+    for (let day = 0; day < 2; day++) { // Extend to two weeks
       const date = new Date();
       date.setDate(date.getDate() + day + 1); // Starting tomorrow
       date.setHours(0, 0, 0, 0);
@@ -219,17 +238,20 @@ exports.autoGenerateJuries = async (req, res, next) => {
         }
       }
     }
+    console.log("[autoGenerateJuries] Generated time slots:", defaultTimeSlots.length);
     
     // First load all teachers' current participation data
-    const departmentTeachers = await Teacher.find({ department })
-      .populate('supervisedProjects')
-      .populate('juryParticipations');
+    console.log("[autoGenerateJuries] Loading department teachers");
+    const departmentTeachers = await Teacher.find({ 
+      department: departmentName  
+    }).populate('supervisedProjects juryParticipations');
+    console.log("[autoGenerateJuries] Teachers found:", departmentTeachers.length);
       
-    // Sort topics by supervisor participation deficit to prioritize those who haven't met their quota
+    // Sort topics by supervisor participation deficit
+    console.log("[autoGenerateJuries] Calculating participation scores for supervisors");
     const topicsWithPriority = await Promise.all(pendingTopics.map(async (topic) => {
       let supervisorScore = 0;
       
-      // If topic has a supervisor, calculate their participation deficit
       if (topic.supervisorId) {
         const supervisor = departmentTeachers.find(
           t => t._id.toString() === topic.supervisorId._id.toString()
@@ -240,74 +262,52 @@ exports.autoGenerateJuries = async (req, res, next) => {
           supervisorScore = participationData.totalDeficit;
         }
       }
-      
-      return {
-        topic,
-        supervisorScore
-      };
+      return { topic, supervisorScore };
     }));
+    console.log("[autoGenerateJuries] Topics with priority:", topicsWithPriority.length);
     
     // Sort by supervisor score (higher deficit first)
     topicsWithPriority.sort((a, b) => b.supervisorScore - a.supervisorScore);
     
     // Try to schedule each topic
     for (const { topic } of topicsWithPriority) {
+      console.log("[autoGenerateJuries] Scheduling topic:", topic.topicName);
       try {
-        // Get the supervisor
         const supervisor = topic.supervisorId;
-        
-        // Try each time slot until we find a suitable one
         let scheduled = false;
         
         for (const slot of defaultTimeSlots) {
-          // Check supervisor availability
+          console.log("[autoGenerateJuries] Checking slot", slot);
           const supervisorAvailable = await isTeacherAvailable(
             supervisor._id, 
             slot.date, 
             slot.startTime, 
             slot.endTime
           );
-          
           if (!supervisorAvailable) continue;
           
-          // Find president based on participation quota
           const presidents = await findSuitableTeachers(
-            'president',
-            supervisor._id,
-            department,
-            slot.date,
-            slot.startTime,
-            slot.endTime
+            'president', supervisor._id, departmentName,
+            slot.date, slot.startTime, slot.endTime
           );
-          
           if (presidents.length === 0) continue;
           const president = presidents[0];
           
-          // Find reporter based on participation quota
           const reporters = await findSuitableTeachers(
-            'reporter',
-            supervisor._id,
-            department,
-            slot.date,
-            slot.startTime,
-            slot.endTime,
+            'reporter', supervisor._id, departmentName,
+            slot.date, slot.startTime, slot.endTime,
             [president._id]
           );
-          
           if (reporters.length === 0) continue;
           const reporter = reporters[0];
           
-          // Find classroom
           const classroom = await findAvailableClassroom(
-            department,
-            slot.date,
-            slot.startTime,
-            slot.endTime
+         slot.date, slot.startTime, slot.endTime
           );
-          
+         console.log('[autoGenerateJuries]  classrooms found ', classroom)
           if (!classroom) continue;
           
-          // We have all the required elements, create the jury
+          console.log("[autoGenerateJuries] Found valid slot for topic", topic.topicName);
           const jury = await Jury.create({
             pfeTopicId: topic._id,
             supervisorId: supervisor._id,
@@ -320,42 +320,48 @@ exports.autoGenerateJuries = async (req, res, next) => {
             status: 'scheduled'
           });
           
-          // Update PFE topic status
+          console.log("[autoGenerateJuries] Created jury", jury._id);
           await PFETopic.findByIdAndUpdate(topic._id, {
             status: 'scheduled',
             presentationDate: new Date(slot.date),
             presentationLocation: classroom.name + ' - ' + classroom.building
           });
           
-          // Add jury participation to teachers
-          const juryParticipation = [supervisor._id, president._id, reporter._id];
-          for (let teacherId of juryParticipation) {
+          for (let teacherId of [supervisor._id, president._id, reporter._id]) {
             await Teacher.findByIdAndUpdate(
               teacherId,
               { $push: { juryParticipations: jury._id } }
             );
+            console.log("[autoGenerateJuries] Updated teacher participation for", teacherId);
           }
           
           scheduled = true;
           results.scheduled++;
+          console.log("[autoGenerateJuries] Topic scheduled successfully", topic.topicName);
           break;
         }
         
         if (!scheduled) {
+          console.log("[autoGenerateJuries] Failed to schedule", topic.topicName);
           results.failed++;
           results.errors.push(`Could not schedule topic: ${topic.topicName}. No suitable time slot found.`);
         }
       } catch (err) {
+        console.error("[autoGenerateJuries] Error scheduling topic", topic.topicName, err);
         results.failed++;
         results.errors.push(`Error scheduling topic ${topic.topicName}: ${err.message}`);
       }
     }
+
+    console.log("[autoGenerateJuries] Final results:", results);
     
     res.status(200).json({
       success: true,
       data: results
     });
   } catch (err) {
+    console.error("[autoGenerateJuries] Unhandled error:", err);
     next(err);
   }
 };
+

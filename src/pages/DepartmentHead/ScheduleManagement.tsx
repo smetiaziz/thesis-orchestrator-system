@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/utils/api';
@@ -11,9 +10,16 @@ import { RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import DepartmentSelector from '@/components/DepartmentSelector';
 
+interface Classroom {
+  _id: string;
+  name: string;
+  building: string;
+  capacity: number;
+}
+
 interface Jury {
   _id: string;
-  topic: {
+  topic?: {
     _id: string;
     topicName: string;
     studentName: string;
@@ -53,31 +59,27 @@ const ScheduleManagement: React.FC = () => {
   const { data: classroomsResponse, isLoading: loadingClassrooms } = useQuery({
     queryKey: ['classrooms'],
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: string[] }>('/classrooms');
+      const response = await api.get<{ success: boolean; data: Classroom[] }>('/classrooms');
       return response;
     },
   });
 
-  
   const autoGenerateMutation = useMutation({
     mutationFn: async () => {
       const response = await api.post<AutoGenerateResponse>(
         '/juries/auto-generate',
         { department: selectedDepartment || "computer science" }
       );
-  
       return response.data;
     },
     onSuccess: (response) => {
-      const { total, scheduled, failed, errors } = response.data;
-  
+      const { total, scheduled, failed, errors } = response;
       if (scheduled > 0) {
         toast({
           title: "Schedule Generated",
           description: `Successfully scheduled ${scheduled} out of ${total} presentations. ${failed > 0 ? `Failed: ${failed}` : ''}`,
           variant: failed > 0 ? "destructive" : "default",
         });
-  
         refetchJuries();
       } else {
         toast({
@@ -86,7 +88,6 @@ const ScheduleManagement: React.FC = () => {
           variant: "destructive",
         });
       }
-  
       errors.forEach(error => {
         toast({
           title: "Error",
@@ -104,19 +105,18 @@ const ScheduleManagement: React.FC = () => {
     },
   });
   
-  
-
   const handleAutoGenerate = () => {
     autoGenerateMutation.mutate();
   };
   
-  const handleSetClassroom = async (juryId: string, classroom: string) => {
+  const handleSetClassroom = async (juryId: string, classroomName: string) => {
     try {
-      await api.put(`/juries/${juryId}/classroom`, { classroom, date: formattedDate });
+      await api.put(`/juries/${juryId}/classroom`, { classroom: classroomName, date: formattedDate });
       toast({
         title: "Success",
         description: "Classroom assigned successfully",
       });
+      refetchJuries();
     } catch (error) {
       toast({
         title: "Error",
@@ -128,7 +128,7 @@ const ScheduleManagement: React.FC = () => {
   
   const juries = juriesResponse?.data || [];
   const classrooms = classroomsResponse?.data || [];
-  
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -176,13 +176,17 @@ const ScheduleManagement: React.FC = () => {
             <div className="space-y-4">
               {juries.map(jury => (
                 <Card key={jury._id} className="p-4">
-                  <h3 className="font-medium">{jury.topic.topicName}</h3>
-                  <p className="text-sm text-muted-foreground">Student: {jury.topic.studentName}</p>
+                  <h3 className="font-medium">{jury.topic?.topicName || 'No Topic Name'}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Student: {jury.topic?.studentName || 'No Student Name'}
+                  </p>
                   
                   <div className="mt-3 flex items-center">
                     <span className="text-sm font-medium mr-2">Classroom:</span>
                     <span className="text-sm">
                       {jury.presentationLocation || 'Not assigned'}
+                      {jury.presentationLocation && classrooms.find(c => c.name === jury.presentationLocation)?.building && 
+                        ` (${classrooms.find(c => c.name === jury.presentationLocation)?.building})`}
                     </span>
                   </div>
                   
@@ -191,13 +195,13 @@ const ScheduleManagement: React.FC = () => {
                     <div className="flex flex-wrap gap-2 mt-1">
                       {classrooms.map(classroom => (
                         <Button
-                          key={classroom}
-                          variant={jury.presentationLocation === classroom ? "default" : "outline"}
+                          key={classroom._id}
+                          variant={jury.presentationLocation === classroom.name ? "default" : "outline"}
                           size="sm"
-                          onClick={() => handleSetClassroom(jury._id, classroom)}
+                          onClick={() => handleSetClassroom(jury._id, classroom.name)}
                           className="text-xs"
                         >
-                          {classroom}
+                          {classroom.name} ({classroom.building})
                         </Button>
                       ))}
                     </div>
