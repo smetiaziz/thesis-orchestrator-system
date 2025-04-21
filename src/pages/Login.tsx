@@ -104,15 +104,7 @@ const Login: React.FC = () => {
                 />
               </div>
 
-              <div className="text-sm text-muted-foreground">
-                <p>Demo accounts:</p>
-                <ul className="list-disc pl-5 mt-1">
-                  <li>admin@university.edu (password: password)</li>
-                  <li>head@university.edu (password: password)</li>
-                  <li>teacher@university.edu (password: password)</li>
-                  <li>student@university.edu (password: password)</li>
-                </ul>
-              </div>
+            
             </CardContent>
             
             <CardFooter className="flex flex-col space-y-4">

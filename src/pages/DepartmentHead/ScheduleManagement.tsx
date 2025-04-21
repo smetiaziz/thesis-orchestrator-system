@@ -56,25 +56,26 @@ const ScheduleManagement: React.FC = () => {
     },
   });
 
-  // Auto-generate mutation
+  
   const autoGenerateMutation = useMutation({
     mutationFn: async () => {
-      const department = user?.department;
-      const params = department ? { department } : {};
-      const response = await api.post<AutoGenerateResponse>('/juries/auto-generate', null, params);
+      const response = await api.post<AutoGenerateResponse>(
+        '/juries/auto-generate',
+        { department: "computer science" } // <== body with static department
+      );
+  
       return response.data;
     },
     onSuccess: (response) => {
-      const { total, scheduled, failed, errors } = response.data;
-      
+      const { total, scheduled, failed, errors } = response;
+  
       if (scheduled > 0) {
         toast({
           title: "Schedule Generated",
           description: `Successfully scheduled ${scheduled} out of ${total} presentations. ${failed > 0 ? `Failed: ${failed}` : ''}`,
           variant: failed > 0 ? "destructive" : "default",
         });
-        
-        // Refresh the juries list
+  
         refetchJuries();
       } else {
         toast({
@@ -83,8 +84,7 @@ const ScheduleManagement: React.FC = () => {
           variant: "destructive",
         });
       }
-      
-      // Show errors if any
+  
       errors.forEach(error => {
         toast({
           title: "Error",
@@ -101,6 +101,8 @@ const ScheduleManagement: React.FC = () => {
       });
     },
   });
+  
+  
 
   const handleAutoGenerate = () => {
     autoGenerateMutation.mutate();
