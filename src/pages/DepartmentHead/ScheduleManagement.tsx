@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/use-toast';
 import { RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import DepartmentSelector from '@/components/DepartmentSelector';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
 interface Classroom {
   _id: string;
@@ -19,13 +20,13 @@ interface Classroom {
 
 interface Jury {
   _id: string;
-  topic?: {
+  pfeTopicId?: {
     _id: string;
     topicName: string;
     studentName: string;
   };
-  presentationDate?: string;
-  presentationLocation?: string;
+  date?: string;
+  location?: string;
   members: string[];
 }
 
@@ -38,25 +39,64 @@ interface AutoGenerateResponse {
     errors: string[];
   };
 }
+const styles = StyleSheet.create({
+  page: { padding: 30 },
+  header: { marginBottom: 20 },
+  title: { fontSize: 24, marginBottom: 10 },
+  subtitle: { fontSize: 14, marginBottom: 5 },
+  table: { display: "flex", width: "100%", marginTop: 20 },
+  row: { flexDirection: "row", borderBottom: 1, padding: 5 },
+  headerCell: { flex: 1, fontWeight: "bold" },
+  cell: { flex: 1 }
+});
+// PDF Document component
+const SchedulePDF = ({ department, date, presentations }) => (
+  <Document>
+    <Page style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{department} Presentation Schedule</Text>
+        <Text style={styles.subtitle}>Date: {format(new Date(date), 'MMMM d, yyyy')}</Text>
+      </View>
+      
+      <View style={styles.table}>
+        <View style={styles.row}>
+          <Text style={styles.headerCell}>Topic</Text>
+          <Text style={styles.headerCell}>Student</Text>
+          <Text style={styles.headerCell}>Classroom</Text>
+        </View>
+        
+        {presentations.map((pres, index) => (
+          <View key={index} style={styles.row}>
+            <Text style={styles.cell}>{pres.topic || 'N/A'}</Text>
+            <Text style={styles.cell}>{pres.student || 'N/A'}</Text>
+            <Text style={styles.cell}>{pres.classroom || 'Not assigned'}</Text>
+          </View>
+        ))}
+      </View>
+    </Page>
+  </Document>
+);
 
 const ScheduleManagement: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  
-  // Fetch juries with presentations on the selected date
+
   const { data: juriesResponse, isLoading: loadingJuries, refetch: refetchJuries } = useQuery({
-    queryKey: ['juries', formattedDate],
+    queryKey: ['juries', formattedDate, selectedDepartment],
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: Jury[] }>(`/juries/date/${formattedDate}`);
+      console.log('user dep ', selectedDepartment)
+
+      const response = await api.get<{ success: boolean; data: Jury[] }>(
+        `/juries/date/${formattedDate}?department=${selectedDepartment}`
+      );
       return response;
     },
-    enabled: !!formattedDate,
+    enabled: !!formattedDate && !!selectedDepartment,
   });
-  
-  // Fetch available classrooms
-  const { data: classroomsResponse, isLoading: loadingClassrooms } = useQuery({
+
+  const { data: classroomsResponse } = useQuery({
     queryKey: ['classrooms'],
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: Classroom[] }>('/classrooms');
@@ -68,7 +108,7 @@ const ScheduleManagement: React.FC = () => {
     mutationFn: async () => {
       const response = await api.post<AutoGenerateResponse>(
         '/juries/auto-generate',
-        { department: selectedDepartment || "computer science" }
+        { department: selectedDepartment }
       );
       return response.data;
     },
@@ -104,11 +144,11 @@ const ScheduleManagement: React.FC = () => {
       });
     },
   });
-  
+
   const handleAutoGenerate = () => {
     autoGenerateMutation.mutate();
   };
-  
+
   const handleSetClassroom = async (juryId: string, classroomName: string) => {
     try {
       await api.put(`/juries/${juryId}/classroom`, { classroom: classroomName, date: formattedDate });
@@ -125,9 +165,20 @@ const ScheduleManagement: React.FC = () => {
       });
     }
   };
-  
+
   const juries = juriesResponse?.data || [];
   const classrooms = classroomsResponse?.data || [];
+  const validJuries = juries.filter(jury => jury.pfeTopicId?.topicName && jury.pfeTopicId?.studentName);
+
+  const pdfData = {
+    department: selectedDepartment,
+    date: selectedDate,
+    presentations: validJuries.map(jury => ({
+      topic: jury.pfeTopicId?.topicName,
+      student: jury.pfeTopicId?.studentName,
+      classroom: jury.location || 'Not assigned'
+    }))
+  };
 
   return (
     <div className="p-6">
@@ -141,9 +192,21 @@ const ScheduleManagement: React.FC = () => {
               placeholder="Select Department"
             />
           </div>
+          {selectedDepartment && (
+            <PDFDownloadLink
+              document={<SchedulePDF {...pdfData} />}
+              fileName={`schedule-${selectedDepartment}-${formattedDate}.pdf`}
+            >
+              {({ loading }) => (
+                <Button disabled={loading}>
+                  {loading ? 'Generating PDF...' : 'Export to PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          )}
           <Button
             onClick={handleAutoGenerate}
-            disabled={autoGenerateMutation.isPending}
+            disabled={autoGenerateMutation.isPending || !selectedDepartment}
             className="gap-2"
           >
             <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
@@ -151,67 +214,73 @@ const ScheduleManagement: React.FC = () => {
           </Button>
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-4">
-          <h2 className="text-lg font-semibold mb-4">Select Date</h2>
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            className="border rounded-md"
-          />
+
+      {!selectedDepartment ? (
+        <Card className="p-4 text-center">
+          <p className="text-muted-foreground">No department selected.</p>
         </Card>
-        
-        <Card className="lg:col-span-2 p-4">
-          <h2 className="text-lg font-semibold mb-4">
-            Presentations on {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
-          </h2>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="p-4">
+            <h2 className="text-lg font-semibold mb-4">Select Date</h2>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              className="border rounded-md"
+            />
+          </Card>
           
-          {loadingJuries ? (
-            <p>Loading schedule...</p>
-          ) : juries.length === 0 ? (
-            <p>No presentations scheduled for this date.</p>
-          ) : (
-            <div className="space-y-4">
-              {juries.map(jury => (
-                <Card key={jury._id} className="p-4">
-                  <h3 className="font-medium">{jury.topic?.topicName || 'No Topic Name'}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Student: {jury.topic?.studentName || 'No Student Name'}
-                  </p>
-                  
-                  <div className="mt-3 flex items-center">
-                    <span className="text-sm font-medium mr-2">Classroom:</span>
-                    <span className="text-sm">
-                      {jury.presentationLocation || 'Not assigned'}
-                      {jury.presentationLocation && classrooms.find(c => c.name === jury.presentationLocation)?.building && 
-                        ` (${classrooms.find(c => c.name === jury.presentationLocation)?.building})`}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-3">
-                    <span className="text-sm font-medium">Assign Classroom:</span>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {classrooms.map(classroom => (
-                        <Button
-                          key={classroom._id}
-                          variant={jury.presentationLocation === classroom.name ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleSetClassroom(jury._id, classroom.name)}
-                          className="text-xs"
-                        >
-                          {classroom.name} ({classroom.building})
-                        </Button>
-                      ))}
+          <Card className="lg:col-span-2 p-4">
+            <h2 className="text-lg font-semibold mb-4">
+              Presentations on {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
+            </h2>
+            
+            {loadingJuries ? (
+              <p>Loading schedule...</p>
+            ) : validJuries.length === 0 ? (
+              <p>No presentations scheduled for this date.</p>
+            ) : (
+              <div className="space-y-4">
+                {validJuries.map(jury => (
+                  <Card key={jury._id} className="p-4">
+                    <h3 className="font-medium">{jury.pfeTopicId.topicName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Student: {jury.pfeTopicId.studentName}
+                    </p>
+                    
+                    <div className="mt-3 flex items-center">
+                      <span className="text-sm font-medium mr-2">Classroom:</span>
+                      <span className="text-sm">
+                        {jury.location || 'Not assigned'}
+                        {jury.location && classrooms.find(c => c.name === jury.location)?.building && 
+                          ` (${classrooms.find(c => c.name === jury.location)?.building})`}
+                      </span>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
+                    
+                    <div className="mt-3">
+                      <span className="text-sm font-medium">Assign Classroom:</span>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {classrooms.map(classroom => (
+                          <Button
+                            key={classroom._id}
+                            variant={jury.location === classroom.name ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleSetClassroom(jury._id, classroom.name)}
+                            className="text-xs"
+                          >
+                            {classroom.name} ({classroom.building})
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

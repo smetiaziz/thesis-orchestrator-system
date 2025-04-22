@@ -2,6 +2,7 @@ const Jury = require('../models/Jury');
 const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
 const TimeSlot = require('../models/TimeSlot');
+const Department = require('../models/Department');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all juries
@@ -112,30 +113,47 @@ exports.getJuriesByDate = async (req, res, next) => {
 
     // Create start and end date for the requested day
     const startDate = new Date(`${dateParam}T00:00:00.000Z`);
-    const endDate = new Date(`${dateParam}T23:59:59.999Z`);
+    const endDate   = new Date(`${dateParam}T23:59:59.999Z`);
 
+    // Base query: juries on this day
     let query = Jury.find({
       date: {
         $gte: startDate,
-        $lt: endDate
+        $lt:  endDate
       }
     });
 
-    // Filter by department (from PFE topic)
+    // If a department filter was passed, look it up and constrain by its PFE topics
+    let department;
     if (req.query.department) {
-      const topics = await PFETopic.find({ department: req.query.department }).select('_id');
-      const topicIds = topics.map(topic => topic._id);
-      query = query.find({ pfeTopicId: { $in: topicIds } });
+      department = await Department.findById(req.query.department);
+      if (!department) {
+        return res.status(404).json({
+          success: false,
+          error: 'Department not found'
+        });
+      }
+
+      console.log('department found:', department.name);
+
+      // Find all topics for that department
+      const topics = await PFETopic
+        .find({ department: department.name })
+        .select('_id');
+      const topicIds = topics.map(t => t._id);
+
+      // Narrow the jury query to only those topics
+      query = query.where('pfeTopicId').in(topicIds);
     }
 
-    query = query
+    // Populate, sort, execute
+    const juries = await query
       .populate({
         path: 'pfeTopicId',
         select: 'topicName studentName'
       })
-      .sort({ startTime: 1 });
-
-    const juries = await query;
+      .sort({ startTime: 1 })
+      .exec();
 
     res.status(200).json({
       success: true,
@@ -145,6 +163,7 @@ exports.getJuriesByDate = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // @desc    Get single jury
 // @route   GET /api/juries/:id
