@@ -52,6 +52,7 @@ const DepartmentHeadDashboard: React.FC = () => {
   const { data: statsData, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['department-dashboard-stats', user?.department],
     queryFn: async () => {
+      console.log('user department ', user.department)
       return api.get<{ success: boolean; data: DashboardStats }>(`/stats/department/${user?.department}`);
     },
     enabled: !!user?.department,
@@ -129,7 +130,7 @@ const DepartmentHeadDashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
               <FileSpreadsheet className="mr-2 text-navy h-5 w-5" />
-              Total Topics
+              Total Topics 
             </CardTitle>
           </CardHeader>
           <CardContent>
