@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/utils/api";
@@ -51,21 +50,28 @@ interface DashboardStats {
 
 const DepartmentHeadDashboard: React.FC = () => {
   const { user } = useAuth();
+  const department = user?.department;
   
   const { data: statsData, isLoading: statsLoading, error: statsError } = useQuery({
-    queryKey: ['department-dashboard-stats', user?.department],
+    queryKey: ['department-dashboard-stats', department],
     queryFn: async () => {
-      return api.get<{ success: boolean; data: DashboardStats }>(`/stats/department/${user?.department}`);
+      if (!department) {
+        throw new Error('Department information is missing');
+      }
+      return api.get<{ success: boolean; data: DashboardStats }>(`/stats/department/${encodeURIComponent(department)}`);
     },
-    enabled: !!user?.department,
+    enabled: !!department,
   });
 
   const { data: teachersData, isLoading: teachersLoading } = useQuery({
-    queryKey: ['department-teachers', user?.department],
+    queryKey: ['department-teachers', department],
     queryFn: async () => {
-      return api.get<{ success: boolean; data: Teacher[] }>(`/teachers?department=${user?.department}`);
+      if (!department) {
+        throw new Error('Department information is missing');
+      }
+      return api.get<{ success: boolean; data: Teacher[] }>(`/teachers?department=${encodeURIComponent(department)}`);
     },
-    enabled: !!user?.department,
+    enabled: !!department,
   });
 
   const stats = statsData?.data || {

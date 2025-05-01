@@ -5,11 +5,11 @@ const Jury = require('../models/Jury');
 const TimeSlot = require('../models/TimeSlot');
 
 // @desc    Get department dashboard stats
-// @route   GET /api/stats/department/:department
+// @route   GET /api/stats/department/:departmentName
 // @access  Private (Admin, Department Head)
 exports.getDepartmentStats = async (req, res, next) => {
   try {
-    const department = req.params.department;
+    const department = req.params.departmentName;
     
     if (!department) {
       return res.status(400).json({
