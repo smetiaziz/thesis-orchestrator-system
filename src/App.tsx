@@ -270,6 +270,43 @@ const App = () => (
             }
           />
           
+          {/* Teacher routes with proper paths matching the links in TeacherDashboard */}
+          <Route
+            path="/teacher/student-supervision"
+            element={
+              <AppLayout allowedRoles={["teacher"]}>
+                <StudentSupervision />
+              </AppLayout>
+            }
+          />
+          
+          <Route
+            path="/teacher/availability"
+            element={
+              <AppLayout allowedRoles={["teacher"]}>
+                <TeacherAvailability />
+              </AppLayout>
+            }
+          />
+          
+          <Route
+            path="/teacher/participation"
+            element={
+              <AppLayout allowedRoles={["teacher"]}>
+                <ParticipationView />
+              </AppLayout>
+            }
+          />
+          
+          <Route
+            path="/teacher/schedule"
+            element={
+              <AppLayout allowedRoles={["teacher"]}>
+                <ScheduleManagement />
+              </AppLayout>
+            }
+          />
+          
           {/* Student routes */}
           <Route
             path="/my-topic"

@@ -11,9 +11,9 @@ const Index = () => {
     if (!isLoading) {
       if (isAuthenticated) {
         if (user?.role === 'departmentHead') {
-          navigate("/department-head/dashboard");
+          navigate("/department-dashboard");
         } else if (user?.role === 'teacher') {
-          navigate("/teacher/dashboard");
+          navigate("/teacher-dashboard");
         } else {
           navigate("/dashboard");
         }

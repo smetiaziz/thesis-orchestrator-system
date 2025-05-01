@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.post<AuthResponse>('/auth/login', { email, password }, false);
+      const data = await api.post<AuthResponse>('/auth/login', { email, password });
       
       if (data.success && data.token && data.user) {
         // Transform backend user to frontend user format
@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     setError(null);
     try {
-      await api.post<AuthResponse>('/auth/register', userData, false);
+      await api.post<AuthResponse>('/auth/register', userData);
     } catch (err) {
       setError((err as Error).message);
       console.error("Registration error:", err);
