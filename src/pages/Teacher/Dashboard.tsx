@@ -7,47 +7,64 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Calendar, Users, FileText, ClipboardList, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface TeacherStatsResponse {
+  success: boolean;
+  data: {
+    supervisedCount: number;
+    juryCount: number;
+    upcomingJuries: UpcomingJury[];
+  }
+}
+
+interface UpcomingJury {
+  _id: string;
+  pfeTopicId: {
+    topicName: string;
+    studentName: string;
+  };
+  date: string;
+  startTime: string;
+  location: string;
+}
+
+interface StudentsResponse {
+  success: boolean;
+  count: number;
+  data: any[];
+}
+
+interface AvailabilityResponse {
+  success: boolean;
+  count: number;
+  data: any[];
+}
 
 const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
   
   // Fetch teacher data including supervision and jury counts
-  const { data: teacherData, isLoading: teacherLoading } = useQuery({
+  const { data: teacherData, isLoading: teacherLoading } = useQuery<TeacherStatsResponse>({
     queryKey: ['teacher-stats'],
     queryFn: async () => {
-      return api.get<{ 
-        success: boolean; 
-        data: {
-          supervisedCount: number;
-          juryCount: number;
-          upcomingJuries: {
-            _id: string;
-            pfeTopicId: {
-              topicName: string;
-              studentName: string;
-            };
-            date: string;
-            startTime: string;
-            location: string;
-          }[];
-        }
-      }>('/stats/teacher');
+      return api.get<TeacherStatsResponse>('/stats/teacher');
     }
   });
   
   // Fetch supervised students count
-  const { data: studentsData, isLoading: studentsLoading } = useQuery({
+  const { data: studentsData, isLoading: studentsLoading } = useQuery<StudentsResponse>({
     queryKey: ['supervised-students-count'],
     queryFn: async () => {
-      return api.get<{ success: boolean; count: number; data: any[] }>('/students/supervised');
+      return api.get<StudentsResponse>('/students/supervised');
     }
   });
   
   // Fetch available time slots count
-  const { data: availabilityData, isLoading: availabilityLoading } = useQuery({
+  const { data: availabilityData, isLoading: availabilityLoading } = useQuery<AvailabilityResponse>({
     queryKey: ['availability-count'],
     queryFn: async () => {
-      return api.get<{ success: boolean; count: number; data: any[] }>('/timeslots/my');
+      return api.get<AvailabilityResponse>('/timeslots/my');
     }
   });
   
@@ -72,13 +89,13 @@ const TeacherDashboard: React.FC = () => {
         
         <div className="flex gap-4">
           <Button asChild variant="outline">
-            <Link to="/availability">
+            <Link to="/teacher/availability">
               <Calendar className="mr-2 h-4 w-4" /> 
               Manage Availability
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/student-supervision">
+            <Link to="/teacher/student-supervision">
               <Users className="mr-2 h-4 w-4" />
               Student Supervision
             </Link>
@@ -95,10 +112,16 @@ const TeacherDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{supervisedCount}</div>
-            <p className="text-sm text-muted-foreground">
-              Topics you are supervising
-            </p>
+            {teacherLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold">{supervisedCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Topics you are supervising
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
@@ -110,10 +133,16 @@ const TeacherDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{juryCount}</div>
-            <p className="text-sm text-muted-foreground">
-              Juries you're part of
-            </p>
+            {teacherLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold">{juryCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Juries you're part of
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
@@ -125,10 +154,16 @@ const TeacherDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{studentCount}</div>
-            <p className="text-sm text-muted-foreground">
-              Students under supervision
-            </p>
+            {studentsLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold">{studentCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Students under supervision
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
         
@@ -140,10 +175,16 @@ const TeacherDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{availabilityCount}</div>
-            <p className="text-sm text-muted-foreground">
-              Available time slots
-            </p>
+            {availabilityLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold">{availabilityCount}</div>
+                <p className="text-sm text-muted-foreground">
+                  Available time slots
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -158,7 +199,11 @@ const TeacherDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             {teacherLoading ? (
-              <div className="text-center py-8">Loading...</div>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
             ) : stats.upcomingJuries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No upcoming presentations scheduled
@@ -193,21 +238,21 @@ const TeacherDashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button asChild variant="outline" className="w-full justify-start">
-              <Link to="/schedule">
+              <Link to="/teacher/schedule">
                 <Calendar className="mr-2 h-4 w-4" />
                 View Schedule
               </Link>
             </Button>
             
             <Button asChild variant="outline" className="w-full justify-start">
-              <Link to="/participation">
+              <Link to="/teacher/participation">
                 <ClipboardList className="mr-2 h-4 w-4" />
                 Participation Tracker
               </Link>
             </Button>
             
             <Button asChild variant="outline" className="w-full justify-start">
-              <Link to="/student-supervision">
+              <Link to="/teacher/student-supervision">
                 <Users className="mr-2 h-4 w-4" />
                 Student Management
               </Link>

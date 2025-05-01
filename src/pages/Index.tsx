@@ -5,17 +5,23 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        navigate("/dashboard");
+        if (user?.role === 'departmentHead') {
+          navigate("/department-head/dashboard");
+        } else if (user?.role === 'teacher') {
+          navigate("/teacher/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       } else {
         navigate("/login");
       }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

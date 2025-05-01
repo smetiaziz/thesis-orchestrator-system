@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { format } from "date-fns";
 
 interface Teacher {
   _id: string;
@@ -29,6 +30,15 @@ interface PFETopic {
   status: 'pending' | 'scheduled' | 'completed';
 }
 
+interface UpcomingPresentation {
+  _id: string;
+  topicName: string;
+  studentName: string;
+  date: string;
+  startTime: string;
+  location: string;
+}
+
 interface DashboardStats {
   totalTopics: number;
   scheduledPresentations: number;
@@ -36,14 +46,7 @@ interface DashboardStats {
   totalTeachers: number;
   teachersWithoutAvailability: number;
   schedulingConflicts: number;
-  upcomingPresentations: {
-    _id: string;
-    topicName: string;
-    studentName: string;
-    date: string;
-    startTime: string;
-    location: string;
-  }[];
+  upcomingPresentations: UpcomingPresentation[];
 }
 
 const DepartmentHeadDashboard: React.FC = () => {
@@ -52,7 +55,6 @@ const DepartmentHeadDashboard: React.FC = () => {
   const { data: statsData, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['department-dashboard-stats', user?.department],
     queryFn: async () => {
-      console.log('user department ', user.department)
       return api.get<{ success: boolean; data: DashboardStats }>(`/stats/department/${user?.department}`);
     },
     enabled: !!user?.department,
@@ -111,13 +113,13 @@ const DepartmentHeadDashboard: React.FC = () => {
         
         <div className="flex gap-4">
           <Button asChild variant="outline">
-            <Link to="/topics/import">
+            <Link to="/department-head/topics/import">
               <FileText className="mr-2 h-4 w-4" />
               Import Topics
             </Link>
           </Button>
           <Button asChild>
-            <Link to="/topics/new">
+            <Link to="/department-head/topics/new">
               <FileText className="mr-2 h-4 w-4" />
               Add Topic
             </Link>
@@ -238,7 +240,7 @@ const DepartmentHeadDashboard: React.FC = () => {
                     <div>
                       <h4 className="font-medium">{presentation.topicName}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {presentation.studentName} - {new Date(presentation.date).toLocaleDateString()} at {presentation.startTime}
+                        {presentation.studentName} - {format(new Date(presentation.date), 'PPP')} at {presentation.startTime}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {presentation.location}
