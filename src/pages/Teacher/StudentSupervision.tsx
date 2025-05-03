@@ -1,443 +1,346 @@
 
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/utils/api';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { toast } from '@/components/ui/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose
-} from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Teacher, Student } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from '@/components/ui/form';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertCircle, FileSpreadsheet, Plus, Upload, UserPlus } from 'lucide-react';
+import { FormProvider, useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { Plus, Upload, Trash, FileText, Search } from 'lucide-react';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import ExcelImport from '@/components/ExcelImport';
 
-interface Student {
-  _id: string;
-  firstName: string;
-  lastName: string;
-  inscNum: string;
-  email: string;
-  subject: string;
-  field: string;
-  supervisor: string;
-}
+// Import new API modules
+import { studentsApi, teachersApi, StudentData } from '@/api';
 
-// Define the student form schema
-const studentFormSchema = z.object({
-  firstName: z.string().min(2, 'First name is required'),
-  lastName: z.string().min(2, 'Last name is required'),
-  inscNum: z.string().min(2, 'Inscription number is required'),
-  email: z.string().email('Valid email is required'),
-  subject: z.string().min(2, 'Subject is required'),
+const formSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required" }),
+  lastName: z.string().min(1, { message: "Last name is required" }),
+  inscrNumber: z.string().min(1, { message: "Inscription number is required" }),
+  email: z.string().email().optional().or(z.literal('')),
   field: z.string().optional(),
 });
 
-type StudentFormValues = z.infer<typeof studentFormSchema>;
+type FormData = z.infer<typeof formSchema>;
 
 const StudentSupervision: React.FC = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const navigate = useNavigate();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Fetch students supervised by the current teacher
-  const { data: studentsResponse, isLoading } = useQuery({
-    queryKey: ['supervised-students', user?._id, searchTerm],
+  // Find the corresponding Teacher record for the logged-in user
+  const { data: teacherData, isLoading: teacherLoading } = useQuery({
+    queryKey: ['teacher-profile', user?.id],
     queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (searchTerm) params.search = searchTerm;
-      if (user?._id) params.supervisor = user._id;
-      
-      return api.get<{ success: boolean; data: Student[] }>('/students/supervised', { params });
+      if (!user?.email) throw new Error('User email not available');
+      const response = await teachersApi.getAll();
+      return {
+        data: response.data.find(t => t.email === user.email)
+      };
     },
-    enabled: !!user?._id,
+    enabled: !!user?.email,
   });
 
-  // Add student mutation
-  const addStudentMutation = useMutation({
-    mutationFn: async (data: StudentFormValues) => {
-      return api.post('/students', {
-        ...data,
-        supervisor: user?._id,
-      });
+  const teacher = teacherData?.data;
+
+  // Get supervised students
+  const { data: studentsData, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
+    queryKey: ['supervised-students', teacher?.id],
+    queryFn: async () => {
+      return studentsApi.getSupervised();
     },
-    onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Student added successfully',
-      });
-      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-      setIsAddDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add student',
-        variant: 'destructive',
-      });
-    },
+    enabled: !!teacher,
   });
+  
+  const students = studentsData?.data || [];
 
-  // Delete student mutation
-  const deleteStudentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return api.delete(`/students/${id}`);
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Student deleted successfully',
-      });
-      queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-      setStudentToDelete(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete student',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Handle file upload for import
-  const handleFileUpload = async (formData: FormData) => {
-    try {
-      const response = await api.post('/students/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      if (response.data && response.data.success) {
-        toast({
-          title: 'Import Successful',
-          description: `${response.data.data.length} students imported successfully`,
-        });
-        queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-        setIsImportDialogOpen(false);
-      } else {
-        toast({
-          title: 'Import Failed',
-          description: 'Failed to import students',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Import Error',
-        description: 'Error occurred during import',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Create form for adding students
-  const form = useForm<StudentFormValues>({
-    resolver: zodResolver(studentFormSchema),
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: '',
       lastName: '',
-      inscNum: '',
+      inscrNumber: '',
       email: '',
-      subject: '',
       field: '',
     },
   });
 
-  const students = studentsResponse?.data || [];
+  const onSubmit = async (data: FormData) => {
+    if (!user?.department || !teacher) {
+      toast.error("Missing department or teacher information");
+      return;
+    }
 
-  const onSubmit = (data: StudentFormValues) => {
-    addStudentMutation.mutate(data);
+    try {
+      const studentData: StudentData = {
+        ...data,
+        department: user.department,
+        supervisorId: teacher.id,
+      };
+
+      await studentsApi.create(studentData);
+      
+      toast.success("Student created successfully");
+      setIsCreateDialogOpen(false);
+      form.reset();
+      refetchStudents();
+    } catch (error) {
+      toast.error("Failed to create student");
+      console.error(error);
+    }
   };
+
+  if (teacherLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!teacher) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-500 flex items-center">
+              <AlertCircle className="mr-2" />
+              Teacher Profile Not Found
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Your user account is not linked to a teacher profile. Please contact the administrator.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Student Supervision</h1>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import from Excel
-          </Button>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Student
+        <h1 className="text-2xl font-bold text-navy">Student Supervision</h1>
+        <div className="flex space-x-2">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle>Add New Student</DialogTitle>
+                <DialogDescription>
+                  Create a new student record that you will supervise
+                </DialogDescription>
+              </DialogHeader>
+              
+              <FormProvider {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="First Name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Last Name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="inscrNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Inscription Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 12345" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email (Optional)</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="student@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="field"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Field of Study (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. AI, Networks, etc." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button type="button" variant="secondary" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">Create Student</Button>
+                  </DialogFooter>
+                </form>
+              </FormProvider>
+            </DialogContent>
+          </Dialog>
+          
+          <Button variant="outline" onClick={() => navigate('/teacher/topics/new')}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            New PFE Topic
           </Button>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Supervised Students</CardTitle>
-          <CardDescription>
-            Students assigned to you for supervision
-          </CardDescription>
-          <div className="relative mt-2">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search students..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Name</TableHead>
-                <TableHead>Inscription #</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Field</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    Loading students...
-                  </TableCell>
-                </TableRow>
-              ) : students.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    No supervised students found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                students.map((student) => (
-                  <TableRow key={student._id}>
-                    <TableCell>
-                      {student.firstName} {student.lastName}
-                    </TableCell>
-                    <TableCell>{student.inscNum}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>{student.subject}</TableCell>
-                    <TableCell>{student.field || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStudentToDelete(student)}
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Add Student Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Student</DialogTitle>
-            <DialogDescription>
-              Add a new student to your supervision list.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="First name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Last name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="inscNum"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Inscription Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Inscription number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Email" type="email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="subject"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subject</FormLabel>
-                    <FormControl>
-                      <Input placeholder="PFE Subject" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="field"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Field (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Field of study" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddDialogOpen(false)}
-                >
-                  Cancel
+      
+      <Tabs defaultValue="students" className="w-full">
+        <TabsList>
+          <TabsTrigger value="students">My Students</TabsTrigger>
+          <TabsTrigger value="import">Import Students</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="students" className="space-y-4 pt-4">
+          {studentsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-48 w-full" />
+              ))}
+            </div>
+          ) : students.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-6">
+                <p className="text-muted-foreground mb-4 text-center">
+                  You are not currently supervising any students.
+                </p>
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Your First Student
                 </Button>
-                <Button type="submit">Add Student</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={!!studentToDelete}
-        onOpenChange={(open) => !open && setStudentToDelete(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {studentToDelete?.firstName}{' '}
-              {studentToDelete?.lastName}? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setStudentToDelete(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                studentToDelete?._id &&
-                deleteStudentMutation.mutate(studentToDelete._id)
-              }
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import Dialog */}
-      {isImportDialogOpen && (
-        <ExcelImport
-          title="Import Students"
-          endpoint="/students/import"
-          description="Import students from Excel file. Please make sure the file includes columns for firstName, lastName, inscNum, subject, and field."
-          successMessage="Students imported successfully"
-          errorMessage="Failed to import students"
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['supervised-students'] });
-            setIsImportDialogOpen(false);
-          }}
-          templateUrl="/templates/students_template.xlsx"
-          requiredColumns={["firstName", "lastName", "inscNum", "subject"]}
-          optionalColumns={["field", "email"]}
-          sampleFormat={{
-            firstName: "John",
-            lastName: "Doe",
-            inscNum: "12345",
-            email: "john@example.com",
-            subject: "AI Implementation",
-            field: "Computer Science"
-          }}
-        />
-      )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {students.map((student) => (
+                <Card key={student.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">
+                      {student.firstName} {student.lastName}
+                    </CardTitle>
+                    <CardDescription>
+                      ID: {student.inscrNumber}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-4 pt-0">
+                    {student.email && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {student.email}
+                      </p>
+                    )}
+                    
+                    {student.field && (
+                      <p className="text-sm font-medium">
+                        Field: {student.field}
+                      </p>
+                    )}
+                    
+                    {student.pfeTopicId ? (
+                      <div className="mt-2 p-2 bg-gray-50 rounded-md">
+                        <p className="text-sm font-medium">
+                          Topic: {(student.pfeTopicId as any)?.topicName || 'Assigned'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 p-2 bg-amber-50 rounded-md">
+                        <p className="text-sm text-amber-700">No PFE topic assigned yet</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="import" className="space-y-4 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Students</CardTitle>
+              <CardDescription>
+                Upload an Excel file with student data to be added to your supervision list
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ExcelImport 
+                title="Import Students"
+                endpoint="/import/students"
+                description="Upload a spreadsheet with student information. The file should include columns for firstName, lastName, inscrNumber, and optionally email and field."
+                successMessage="Students imported successfully"
+                errorMessage="Failed to import students"
+                onSuccess={() => refetchStudents()}
+                templateUrl="/templates/students_import_template.xlsx"
+                sampleFormat={{
+                  firstName: "John",
+                  lastName: "Doe",
+                  inscrNumber: "123456",
+                  email: "john.doe@example.com",
+                  field: "Computer Science"
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

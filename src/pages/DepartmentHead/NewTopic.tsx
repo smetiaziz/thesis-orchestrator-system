@@ -48,6 +48,10 @@ const topicSchema = z.object({
 
 type TopicFormValues = z.infer<typeof topicSchema>;
 
+
+
+
+
 const NewTopic: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
