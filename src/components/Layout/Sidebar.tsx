@@ -24,8 +24,7 @@ const Sidebar: React.FC = () => {
   // Define navigation links based on user role
   const getNavLinks = () => {
     const commonLinks = [
-      { to: "/dashboard", icon: <Home className="h-5 w-5" />, text: "Dashboard" },
-      { to: "/profile", icon: <User className="h-5 w-5" />, text: "Profile" },
+      { to: "/department-dashboard", icon: <Home className="h-5 w-5" />, text: "Dashboard" },
     ];
 
     const roleSpecificLinks = {
@@ -44,7 +43,6 @@ const Sidebar: React.FC = () => {
         { to: "/schedule", icon: <Calendar className="h-5 w-5" />, text: "Schedule" },
         { to: "/data-import", icon: <Upload className="h-5 w-5" />, text: "Import Data" },
         { to: "/participation", icon: <ClipboardList className="h-5 w-5" />, text: "Participation" },
-        { to: "/reports", icon: <BarChart4 className="h-5 w-5" />, text: "Reports" },
       ],
       teacher: [
         { to: "/presentations", icon: <BookOpen className="h-5 w-5" />, text: "My Presentations" },
