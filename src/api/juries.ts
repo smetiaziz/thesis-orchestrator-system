@@ -1,6 +1,7 @@
 
 import { api } from './client';
 import { ApiResponse } from './config';
+import { Teacher } from '@/types';
 
 export interface JuryData {
   pfeTopicId: string;
@@ -42,6 +43,17 @@ export interface Jury {
   endTime: string;
   location: string;
   status: 'scheduled' | 'completed' | 'canceled';
+}
+
+export interface JuryEditData {
+  supervisorId?: string;
+  presidentId?: string;
+  reporterId?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  status?: 'scheduled' | 'completed' | 'canceled';
 }
 
 export const juriesApi = {
