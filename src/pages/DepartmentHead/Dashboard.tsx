@@ -117,20 +117,7 @@ const DepartmentHeadDashboard: React.FC = () => {
           Department Dashboard
         </h1>
         
-        <div className="flex gap-4">
-          <Button asChild variant="outline">
-            <Link to="/department-head/topics/import">
-              <FileText className="mr-2 h-4 w-4" />
-              Import Topics
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link to="/department-head/topics/new">
-              <FileText className="mr-2 h-4 w-4" />
-              Add Topic
-            </Link>
-          </Button>
-        </div>
+        
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
