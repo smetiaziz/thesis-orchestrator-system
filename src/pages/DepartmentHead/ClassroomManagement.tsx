@@ -61,7 +61,7 @@ const ClassroomManagement: React.FC = () => {
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedBuilding, setSelectedBuilding] = useState("all");
   const [minCapacity, setMinCapacity] = useState("");
   
@@ -74,7 +74,7 @@ const ClassroomManagement: React.FC = () => {
     name: "",
     building: "",
     capacity: 30,
-    department: user?.department || "",
+    department: "all",
     hasProjector: true,
     hasComputers: false,
     notes: ""

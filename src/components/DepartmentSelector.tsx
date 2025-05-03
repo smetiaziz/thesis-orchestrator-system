@@ -79,6 +79,7 @@ const DepartmentSelector: React.FC<DepartmentSelectorProps> = ({
               </SelectItem>
             ) : (
               departments.map((dept) => (
+                
                 <SelectItem key={dept._id} value={dept._id || "unknown"}>
                   {dept.name}
                 </SelectItem>

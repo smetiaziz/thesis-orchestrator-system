@@ -67,6 +67,7 @@ const NewTopic: React.FC = () => {
     },
   });
   
+  
   // Fetch teachers for supervisor selection
   const { data: teachersResponse } = useQuery({
     queryKey: ['teachers', form.watch('department')],
@@ -78,6 +79,7 @@ const NewTopic: React.FC = () => {
     enabled: !!form.watch('department'),
   });
   
+
   const teachers = teachersResponse?.data || [];
   
   // Create topic mutation

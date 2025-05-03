@@ -1,5 +1,6 @@
 
 const Classroom = require('../models/Classroom');
+const Department = require('../models/Department');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all classrooms
@@ -10,8 +11,16 @@ exports.getClassrooms = async (req, res, next) => {
     let query = Classroom.find();
     
     // Filter by department
-    if (req.query.department) {
-      query = query.find({ department: req.query.department });
+    if (req.query.department != "all") {
+      department = await Department.findById(req.query.department);
+      if (!department) {
+        return res.status(404).json({
+          success: false,
+          error: 'Department not found'
+        });
+      }
+      console.log('Department found:', department.name);
+      query = query.find({ department: department.name });
     }
     
     // Filter by building
@@ -59,21 +68,30 @@ exports.getClassroom = async (req, res, next) => {
   }
 };
 
-// @desc    Create new classroom
+// @desc    Create classroom with department ID validation
 // @route   POST /api/classrooms
-// @access  Private (Admin, Department Head)
+// @access  Private
 exports.createClassroom = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    // ✅ Validate department by ID
+    const department = await Department.findById(req.body.department);
+    if (!department) {
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        error: 'Department does not exist'
       });
     }
-    
+
+    // ✅ Replace department ID with name
+    req.body.department = department.name;
+
     const classroom = await Classroom.create(req.body);
-    
+
     res.status(201).json({
       success: true,
       data: classroom

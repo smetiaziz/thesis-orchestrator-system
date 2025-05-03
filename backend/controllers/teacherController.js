@@ -1,6 +1,7 @@
 
 const Teacher = require('../models/Teacher');
 const User = require('../models/User');
+const Department = require('../models/Department');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all teachers
@@ -8,15 +9,25 @@ const { validationResult } = require('express-validator');
 // @access  Private
 exports.getTeachers = async (req, res, next) => {
   try {
-    let query = Teacher.find();
 
-    // Filter by department if specified
-    if (req.query.department) {
-      query = query.find({ department: req.query.department });
-    }
+   let query = Teacher.find();
+       console.log("dept:00",req.query.department)
+       // Filter by department
+       if (req.query.department && req.query.department != "all") {
+         department = await Department.findById(req.query.department);
+         if (!department) {
+           return res.status(404).json({
+             success: false,
+             error: 'Department not found'
+           });
+         }
+         console.log('Department found:', department.name);
+         query = query.find({ department: department.name });
+       }
 
     const teachers = await query.sort({ lastName: 1, firstName: 1 });
-
+    console.log("✅ Found teachers:", teachers.length);
+    
     res.status(200).json({
       success: true,
       count: teachers.length,
@@ -26,6 +37,7 @@ exports.getTeachers = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // @desc    Get single teacher
 // @route   GET /api/teachers/:id

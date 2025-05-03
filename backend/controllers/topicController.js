@@ -1,6 +1,7 @@
 
 const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
+const Department = require('../models/Department');
 const { validationResult } = require('express-validator');
 
 // @desc    Get all PFE topics
@@ -9,11 +10,20 @@ const { validationResult } = require('express-validator');
 exports.getTopics = async (req, res, next) => {
   try {
     let query = PFETopic.find();
-
+   
     // Filter by department if specified
-    if (req.query.department) {
-      query = query.find({ department: req.query.department });
+   // Check if department query parameter exists
+   if (req.query.department != "all") {
+    department = await Department.findById(req.query.department);
+    if (!department) {
+      return res.status(404).json({
+        success: false,
+        error: 'Department not found'
+      });
     }
+    console.log('Department found:', department.name);
+    query = query.find({ department: department.name });
+  }
 
     // Filter by supervisor if specified
     if (req.query.supervisorId) {

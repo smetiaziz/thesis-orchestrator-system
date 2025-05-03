@@ -63,7 +63,7 @@ const TopicManagement: React.FC = () => {
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedSupervisor, setSelectedSupervisor] = useState("all"); // Changed from empty string to "all"
   const [selectedStatus, setSelectedStatus] = useState("all"); // Changed from empty string to "all"
   const [topicToDelete, setTopicToDelete] = useState<PFETopic | null>(null);

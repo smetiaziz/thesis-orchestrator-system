@@ -52,7 +52,7 @@ const TeachersList: React.FC = () => {
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -61,12 +61,23 @@ const TeachersList: React.FC = () => {
   const { data: teachersResponse, isLoading } = useQuery({
     queryKey: ['teachers', searchTerm, selectedDepartment, selectedStatus],
     queryFn: async () => {
+      console.log("selectedDepartment:",selectedDepartment);
       const params: Record<string, string> = {};
-      if (searchTerm) params.search = searchTerm;
-      if (selectedDepartment) params.department = selectedDepartment;
-      if (selectedStatus !== 'all') params.status = selectedStatus;
+      let queryParams = new URLSearchParams();
+     
+      if (selectedDepartment) {
+        queryParams.append('department', selectedDepartment);
+      }
       
-      return api.get<{ success: boolean; data: Teacher[] }>('/teachers', { params });
+      
+
+
+      // if (searchTerm) params.search = searchTerm;
+      // if (selectedDepartment !== 'all') params.department = selectedDepartment;
+      // if (selectedStatus !== 'all') params.status = selectedStatus;
+      
+      return api.get<{ success: boolean; data: Teacher[] }>(`/teachers?${queryParams.toString()}`);
+     // return api.get<{ success: boolean; data: Classroom[] }>(`/classrooms?${queryParams.toString()}`);
     },
     enabled: true
   });
