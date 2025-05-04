@@ -6,10 +6,17 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from '@/components/ui/use-toast';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, FileDown, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import DepartmentSelector from '@/components/DepartmentSelector';
-import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { 
+  PDFDownloadLink, 
+  Document, 
+  Page, 
+  Text, 
+  View, 
+  StyleSheet 
+} from '@react-pdf/renderer';
 
 interface Classroom {
   _id: string;
@@ -39,61 +46,211 @@ interface AutoGenerateResponse {
     errors: string[];
   };
 }
+
+// Enhanced PDF styles
 const styles = StyleSheet.create({
-  page: { padding: 30 },
-  header: { marginBottom: 20 },
-  title: { fontSize: 24, marginBottom: 10 },
-  subtitle: { fontSize: 14, marginBottom: 5 },
-  table: { display: "flex", width: "100%", marginTop: 20 },
-  row: { flexDirection: "row", borderBottom: 1, padding: 5 },
-  headerCell: { flex: 1, fontWeight: "bold" },
-  cell: { flex: 1 }
+  page: { 
+    padding: 30,
+    fontFamily: 'Helvetica'
+  },
+  header: { 
+    marginBottom: 20,
+    borderBottom: 1,
+    borderBottomColor: '#DDDDDD',
+    paddingBottom: 10
+  },
+  title: { 
+    fontSize: 24, 
+    marginBottom: 10,
+    fontWeight: 'bold'
+  },
+  subtitle: { 
+    fontSize: 14, 
+    marginBottom: 5,
+    color: '#666666'
+  },
+  dateSection: {
+    marginTop: 15,
+    marginBottom: 10
+  },
+  dateHeader: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    backgroundColor: '#F3F4F6',
+    padding: 8,
+    marginBottom: 10
+  },
+  table: { 
+    width: '100%', 
+    marginTop: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB'
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingVertical: 8,
+    paddingHorizontal: 5
+  },
+  row: { 
+    flexDirection: 'row', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#E5E7EB',
+    minHeight: 24,
+    paddingVertical: 6,
+    paddingHorizontal: 5
+  },
+  lastRow: {
+    flexDirection: 'row',
+    minHeight: 24,
+    paddingVertical: 6,
+    paddingHorizontal: 5
+  },
+  headerCell: { 
+    flex: 1, 
+    fontWeight: 'bold',
+    fontSize: 12
+  },
+  cell: { 
+    flex: 1,
+    fontSize: 10,
+    paddingRight: 3
+  },
+  largeCell: {
+    flex: 2,
+    fontSize: 10,
+    paddingRight: 3
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 30,
+    right: 30,
+    fontSize: 10,
+    textAlign: 'center',
+    color: '#666666'
+  },
+  empty: {
+    padding: 10,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    color: '#999999',
+    fontSize: 12
+  },
+  pageNumber: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    fontSize: 10,
+    color: '#666666'
+  }
 });
-// PDF Document component
-const SchedulePDF = ({ department, date, presentations }) => (
-  <Document>
-    <Page style={styles.page}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{department} Presentation Schedule</Text>
-        <Text style={styles.subtitle}>Date: {format(new Date(date), 'MMMM d, yyyy')}</Text>
-      </View>
-      
-      <View style={styles.table}>
-        <View style={styles.row}>
-          <Text style={styles.headerCell}>Topic</Text>
-          <Text style={styles.headerCell}>Student</Text>
-          <Text style={styles.headerCell}>Classroom</Text>
+
+// Enhanced PDF Document component
+const SchedulePDF = ({ department, allPresentations }) => {
+  // Group presentations by date
+  const presentationsByDate = {};
+  
+  allPresentations.forEach(pres => {
+    if (!presentationsByDate[pres.date]) {
+      presentationsByDate[pres.date] = [];
+    }
+    presentationsByDate[pres.date].push(pres);
+  });
+
+  // Sort dates
+  const sortedDates = Object.keys(presentationsByDate).sort();
+
+  return (
+    <Document>
+      <Page style={styles.page}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{department} Department</Text>
+          <Text style={styles.subtitle}>Complete Presentation Schedule</Text>
+          <Text style={styles.subtitle}>Generated on: {format(new Date(), 'MMMM d, yyyy')}</Text>
         </View>
         
-        {presentations.map((pres, index) => (
-          <View key={index} style={styles.row}>
-            <Text style={styles.cell}>{pres.topic || 'N/A'}</Text>
-            <Text style={styles.cell}>{pres.student || 'N/A'}</Text>
-            <Text style={styles.cell}>{pres.classroom || 'Not assigned'}</Text>
+        {sortedDates.length === 0 ? (
+          <View style={styles.empty}>
+            <Text>No presentations scheduled for this department.</Text>
           </View>
-        ))}
-      </View>
-    </Page>
-  </Document>
-);
+        ) : (
+          sortedDates.map((date, dateIndex) => (
+            <View key={date} style={styles.dateSection}>
+              <Text style={styles.dateHeader}>
+                {format(new Date(date), 'EEEE, MMMM d, yyyy')}
+              </Text>
+              
+              <View style={styles.table}>
+                <View style={styles.tableHeader}>
+                  <Text style={styles.headerCell}>Topic</Text>
+                  <Text style={styles.headerCell}>Student</Text>
+                  <Text style={styles.headerCell}>Classroom</Text>
+                  <Text style={styles.headerCell}>Jury Members</Text>
+                </View>
+                
+                {presentationsByDate[date].map((pres, index) => (
+                  <View 
+                    key={index} 
+                    style={index === presentationsByDate[date].length - 1 ? styles.lastRow : styles.row}
+                  >
+                    <Text style={styles.largeCell}>{pres.topic || 'N/A'}</Text>
+                    <Text style={styles.cell}>{pres.student || 'N/A'}</Text>
+                    <Text style={styles.cell}>{pres.classroom || 'Not assigned'}</Text>
+                    <Text style={styles.cell}>{pres.juryMembers || 'Not assigned'}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))
+        )}
+        
+        <Text style={styles.footer}>
+          {department} Department - {sortedDates.length} days scheduled
+        </Text>
+        
+        <Text 
+          style={styles.pageNumber} 
+          render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} 
+        />
+      </Page>
+    </Document>
+  );
+};
 
 const ScheduleManagement: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [exportingAll, setExportingAll] = useState<boolean>(false);
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
 
+  // Query for specific date
   const { data: juriesResponse, isLoading: loadingJuries, refetch: refetchJuries } = useQuery({
     queryKey: ['juries', formattedDate, selectedDepartment],
     queryFn: async () => {
-      console.log('user dep ', selectedDepartment)
-
       const response = await api.get<{ success: boolean; data: Jury[] }>(
         `/juries/date/${formattedDate}?department=${selectedDepartment}`
       );
       return response;
     },
     enabled: !!formattedDate && !!selectedDepartment,
+  });
+
+  // Query for all dates (for the PDF export)
+  const { data: allJuriesResponse, isLoading: loadingAllJuries } = useQuery({
+    queryKey: ['all-juries', selectedDepartment],
+    queryFn: async () => {
+      if (!selectedDepartment) return { data: [] };
+      const response = await api.get<{ success: boolean; data: Jury[] }>(
+        `/juries/department/${selectedDepartment}`
+      );
+      return response;
+    },
+    enabled: !!selectedDepartment && exportingAll,
   });
 
   const { data: classroomsResponse } = useQuery({
@@ -110,10 +267,10 @@ const ScheduleManagement: React.FC = () => {
         '/juries/auto-generate',
         { department: selectedDepartment }
       );
-      return response.data;
+      return response;
     },
     onSuccess: (response) => {
-      const { total, scheduled, failed, errors } = response;
+      const { total, scheduled, failed, errors } = response.data;
       if (scheduled > 0) {
         toast({
           title: "Schedule Generated",
@@ -128,13 +285,15 @@ const ScheduleManagement: React.FC = () => {
           variant: "destructive",
         });
       }
-      errors.forEach(error => {
-        toast({
-          title: "Error",
-          description: error,
-          variant: "destructive",
+      if (errors && errors.length > 0) {
+        errors.forEach(error => {
+          toast({
+            title: "Error",
+            description: error,
+            variant: "destructive",
+          });
         });
-      });
+      }
     },
     onError: () => {
       toast({
@@ -166,17 +325,38 @@ const ScheduleManagement: React.FC = () => {
     }
   };
 
+  // Handle preparation of PDF data
+  const handlePrepareExport = () => {
+    setExportingAll(true);
+  };
+
   const juries = juriesResponse?.data || [];
+  const allJuries = allJuriesResponse?.data || [];
   const classrooms = classroomsResponse?.data || [];
   const validJuries = juries.filter(jury => jury.pfeTopicId?.topicName && jury.pfeTopicId?.studentName);
+  const validAllJuries = allJuries.filter(jury => jury.pfeTopicId?.topicName && jury.pfeTopicId?.studentName);
 
+  // Format data for PDF export (single date)
   const pdfData = {
     department: selectedDepartment,
-    date: selectedDate,
-    presentations: validJuries.map(jury => ({
+    allPresentations: validJuries.map(jury => ({
+      date: jury.date,
       topic: jury.pfeTopicId?.topicName,
       student: jury.pfeTopicId?.studentName,
-      classroom: jury.location || 'Not assigned'
+      classroom: jury.location || 'Not assigned',
+      juryMembers: jury.members?.join(', ') || 'Not assigned'
+    }))
+  };
+
+  // Format data for all dates PDF export
+  const allPdfData = {
+    department: selectedDepartment,
+    allPresentations: validAllJuries.map(jury => ({
+      date: jury.date,
+      topic: jury.pfeTopicId?.topicName,
+      student: jury.pfeTopicId?.studentName,
+      classroom: jury.location || 'Not assigned',
+      juryMembers: jury.members?.join(', ') || 'Not assigned'
     }))
   };
 
@@ -192,26 +372,52 @@ const ScheduleManagement: React.FC = () => {
               placeholder="Select Department"
             />
           </div>
+          
           {selectedDepartment && (
-            <PDFDownloadLink
-              document={<SchedulePDF {...pdfData} />}
-              fileName={`schedule-${selectedDepartment}-${formattedDate}.pdf`}
-            >
-              {({ loading }) => (
-                <Button disabled={loading}>
-                  {loading ? 'Generating PDF...' : 'Export to PDF'}
+            <div className="flex gap-2">
+              {/* PDF Export for current date */}
+              <PDFDownloadLink
+                document={<SchedulePDF {...pdfData} />}
+                fileName={`schedule-${selectedDepartment}-${formattedDate}.pdf`}
+              >
+                {({ loading }) => (
+                  <Button variant="outline" disabled={loading} className="gap-1">
+                    <CalendarIcon className="h-4 w-4" />
+                    {loading ? 'Generating...' : 'Export Current Date'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+              
+              {/* PDF Export for all dates */}
+              {exportingAll ? (
+                <PDFDownloadLink
+                  document={<SchedulePDF {...allPdfData} />}
+                  fileName={`complete-schedule-${selectedDepartment}.pdf`}
+                >
+                  {({ loading }) => (
+                    <Button disabled={loading || loadingAllJuries} className="gap-1">
+                      <FileDown className="h-4 w-4" />
+                      {loading || loadingAllJuries ? 'Generating...' : 'Download Complete Schedule'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              ) : (
+                <Button onClick={handlePrepareExport} className="gap-1">
+                  <FileDown className="h-4 w-4" />
+                  Export All Dates
                 </Button>
               )}
-            </PDFDownloadLink>
+              
+              <Button
+                onClick={handleAutoGenerate}
+                disabled={autoGenerateMutation.isPending || !selectedDepartment}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                Auto-Generate Schedule
+              </Button>
+            </div>
           )}
-          <Button
-            onClick={handleAutoGenerate}
-            disabled={autoGenerateMutation.isPending || !selectedDepartment}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
-            Auto-Generate Schedule
-          </Button>
         </div>
       </div>
 
@@ -256,6 +462,15 @@ const ScheduleManagement: React.FC = () => {
                         {jury.location && classrooms.find(c => c.name === jury.location)?.building && 
                           ` (${classrooms.find(c => c.name === jury.location)?.building})`}
                       </span>
+                    </div>
+                    
+                    <div className="mt-2">
+                      <span className="text-sm font-medium">Jury Members:</span>
+                      <p className="text-sm text-muted-foreground">
+                        {jury.members?.length > 0 
+                          ? jury.members.join(', ') 
+                          : 'No jury members assigned'}
+                      </p>
                     </div>
                     
                     <div className="mt-3">
