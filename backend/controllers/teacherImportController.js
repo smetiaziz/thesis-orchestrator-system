@@ -64,15 +64,17 @@ exports.importTeachers = async (req, res, next) => {
         let user = await User.findOne({ email: row.email });
         let newAccount = false;
         let password = '';
-
+    
         if (!user) {
-          password = crypto.randomBytes(8).toString('hex');
+          password = 'password';
           user = new User({ ...row, role: 'teacher', password });
           await user.save();
           newAccount = true;
         } else {
+          // Reset password for existing user
           user.role = 'teacher';
           user.department = row.department;
+          user.password = 'password'; // Set password to 'password'
           await user.save();
         }
 

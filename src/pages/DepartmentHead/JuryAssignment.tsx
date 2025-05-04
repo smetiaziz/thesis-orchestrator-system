@@ -43,7 +43,7 @@ const JuryAssignment: React.FC = () => {
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
   const [selectedDate, setSelectedDate] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [juryToDelete, setJuryToDelete] = useState<Jury | null>(null);

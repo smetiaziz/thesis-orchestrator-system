@@ -78,7 +78,7 @@ const TopicManagement: React.FC = () => {
       if (searchTerm) {
         queryParams.append('search', searchTerm);
       }
-      
+      console.log(selectedDepartment)
       if (selectedDepartment) {
         queryParams.append('department', selectedDepartment);
       }
