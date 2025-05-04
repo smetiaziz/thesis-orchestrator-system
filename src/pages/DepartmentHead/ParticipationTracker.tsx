@@ -1,9 +1,14 @@
-
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -25,13 +30,25 @@ interface Teacher {
   lastName: string;
   email: string;
   department: string;
-  rank: string;
-  supervisedProjects: string[];
-  juryParticipations: string[];
+}
+
+interface Jury {
+  _id: string;
+  pfeTopicId: string;
+  supervisorId: string;
+  presidentId: string;
+  reporterId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  location: string;
+  status: string;
 }
 
 interface ParticipationStats {
   supervisedCount: number;
+  presidentCount: number;
+  reporterCount: number;
   participationCount: number;
   requiredParticipations: number;
   percentage: number;
@@ -40,90 +57,97 @@ interface ParticipationStats {
 
 const ParticipationTracker: React.FC = () => {
   const { user } = useAuth();
-  const [selectedDepartment, setSelectedDepartment] = useState(user?.department || "");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch teachers data
-  const { data: teachersResponse, isLoading } = useQuery({
-    queryKey: ['teacher-participation', selectedDepartment, searchTerm],
-    queryFn: async () => {
-      let queryParams = new URLSearchParams();
-      
-      if (selectedDepartment) {
-        queryParams.append('department', selectedDepartment);
-      }
-      
-      if (searchTerm) {
-        queryParams.append('search', searchTerm);
-      }
-      
-      return api.get<{ success: boolean; data: Teacher[] }>(`/teachers?${queryParams.toString()}`);
-    }
+  // Fetch teachers list
+  const { data: teachersRes, isLoading: loadingTeachers } = useQuery({
+    queryKey: ['teachers', selectedDepartment],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedDepartment) params.append('department', selectedDepartment);
+      return api.get<{ success: boolean; data: Teacher[] }>(
+        `/teachers?${params.toString()}`
+      );
+    },
   });
 
-  const teachers = teachersResponse?.data || [];
+  // Fetch juries (participation records)
+  const { data: juriesRes, isLoading: loadingJuries } = useQuery({
+    queryKey: ['juries', selectedDepartment],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedDepartment && selectedDepartment !== "all") params.append('department', selectedDepartment);
+      params.append('forParticipation', 'true');
+      return api.get<{ success: boolean; data: Jury[] }>(
+        `/juries?${params.toString()}`
+      );
+    },
+  });
 
-  // Calculate participation statistics for a teacher
+  const teachers = teachersRes?.data || [];
+  const juries = juriesRes?.data || [];
+
+  // Calculate stats for each teacher
   const calculateStats = (teacher: Teacher): ParticipationStats => {
-    const supervisedCount = teacher.supervisedProjects.length;
-    const participationCount = teacher.juryParticipations.length;
-    const requiredParticipations = Math.max(supervisedCount * 3, 0); // At least 0
-    
-    const percentage = requiredParticipations 
+    const supervisedCount = juries.filter(j => j.supervisorId === teacher._id).length;
+    const presidentCount = juries.filter(j => j.presidentId === teacher._id).length;
+    const reporterCount = juries.filter(j => j.reporterId === teacher._id).length;
+    const participationCount = supervisedCount + presidentCount + reporterCount;
+
+    const requiredParticipations = supervisedCount * 3;
+    const pct = requiredParticipations > 0 
       ? Math.round((participationCount / requiredParticipations) * 100) 
-      : 100; // If no requirements, consider 100%
-    
-    let status: 'under' | 'met' | 'over';
-    if (percentage < 100) {
-      status = 'under';
-    } else if (percentage === 100) {
-      status = 'met';
-    } else {
-      status = 'over';
-    }
-    
+      : 100;
+
+    let status: ParticipationStats['status'] = 'met';
+    if (pct < 100) status = 'under';
+    else if (pct > 100) status = 'over';
+
     return {
       supervisedCount,
+      presidentCount,
+      reporterCount,
       participationCount,
       requiredParticipations,
-      percentage,
+      percentage: pct,
       status,
     };
   };
 
-  // Generate export URL for reports
+  // Export URL
   const generateExportUrl = () => {
-    let queryParams = new URLSearchParams();
-    
-    if (selectedDepartment) {
-      queryParams.append('department', selectedDepartment);
-    }
-    
-    return `/api/reports/participation-export?${queryParams.toString()}`;
+    const params = new URLSearchParams();
+    if (selectedDepartment) params.append('department', selectedDepartment);
+    return `/api/reports/participation-export?${params.toString()}`;
   };
 
-  // Sort teachers by participation percentage (ascending)
-  const sortedTeachers = [...teachers].sort((a, b) => {
-    const statsA = calculateStats(a);
-    const statsB = calculateStats(b);
-    return statsA.percentage - statsB.percentage;
-  });
+  // Filtering and sorting
+  const filtered = teachers.filter((t) =>
+    `${t.firstName} ${t.lastName}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
+  const sorted = [...filtered].sort((a, b) =>
+    calculateStats(a).percentage - calculateStats(b).percentage
+  );
+
+  const isLoading = loadingTeachers || loadingJuries;
 
   return (
     <div className="py-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-navy">Teacher Participation Tracker</h1>
-        
-        <div className="flex gap-4">
-          <Button variant="outline" asChild>
-            <a href={generateExportUrl()} target="_blank" rel="noopener noreferrer">
-              <FileText className="mr-2 h-4 w-4" />
-              Export Report
-            </a>
-          </Button>
-        </div>
+        <h1 className="text-2xl font-bold text-navy">
+          Teacher Participation Tracker
+        </h1>
+        <Button variant="outline" asChild>
+          <a href={generateExportUrl()} target="_blank" rel="noopener noreferrer">
+            <FileText className="mr-2 h-4 w-4" /> Export Report
+          </a>
+        </Button>
       </div>
-      
+
+      {/* Filters */}
       <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
@@ -135,7 +159,6 @@ const ParticipationTracker: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
           <DepartmentSelector
             value={selectedDepartment}
             onValueChange={setSelectedDepartment}
@@ -144,12 +167,13 @@ const ParticipationTracker: React.FC = () => {
           />
         </div>
       </Card>
-      
+
+      {/* Statistics Table */}
       <Card>
         <CardHeader>
           <CardTitle>Teacher Participation Statistics</CardTitle>
           <CardDescription>
-            Each teacher must participate in 3× the number of projects they supervise
+            3× the number of supervision sessions = required participations
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,10 +181,12 @@ const ParticipationTracker: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Teacher</TableHead>
-                <TableHead>Department</TableHead>
+                <TableHead>Dept</TableHead>
                 <TableHead>Supervised</TableHead>
+                <TableHead>President</TableHead>
+                <TableHead>Reporter</TableHead>
+                <TableHead>Total</TableHead>
                 <TableHead>Required</TableHead>
-                <TableHead>Actual</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Progress</TableHead>
               </TableRow>
@@ -168,18 +194,19 @@ const ParticipationTracker: React.FC = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6">Loading teachers...</TableCell>
+                  <TableCell colSpan={9} className="text-center py-6">
+                    Loading data...
+                  </TableCell>
                 </TableRow>
-              ) : sortedTeachers.length === 0 ? (
+              ) : sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6">
-                    No teachers found with the current filters
+                  <TableCell colSpan={9} className="text-center py-6">
+                    No teachers found
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedTeachers.map((teacher) => {
+                sorted.map((teacher) => {
                   const stats = calculateStats(teacher);
-                  
                   return (
                     <TableRow key={teacher._id}>
                       <TableCell className="font-medium">
@@ -187,23 +214,22 @@ const ParticipationTracker: React.FC = () => {
                       </TableCell>
                       <TableCell>{teacher.department}</TableCell>
                       <TableCell>{stats.supervisedCount}</TableCell>
-                      <TableCell>{stats.requiredParticipations}</TableCell>
+                      <TableCell>{stats.presidentCount}</TableCell>
+                      <TableCell>{stats.reporterCount}</TableCell>
                       <TableCell>{stats.participationCount}</TableCell>
+                      <TableCell>{stats.requiredParticipations}</TableCell>
                       <TableCell>
                         {stats.status === 'under' ? (
-                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Under Quota
+                          <Badge variant="outline">
+                            <AlertTriangle className="mr-1 h-3 w-3" /> Under
                           </Badge>
                         ) : stats.status === 'met' ? (
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Met Quota
+                          <Badge variant="outline">
+                            <CheckCircle className="mr-1 h-3 w-3" /> Met
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Exceeded
+                          <Badge variant="outline">
+                            <CheckCircle className="mr-1 h-3 w-3" /> Exceeded
                           </Badge>
                         )}
                       </TableCell>
@@ -212,7 +238,6 @@ const ParticipationTracker: React.FC = () => {
                           <Progress
                             value={Math.min(stats.percentage, 100)}
                             className="h-2"
-                            indicator={stats.status === 'under' ? 'bg-yellow-500' : 'bg-green-500'}
                           />
                           <span className="text-sm font-medium w-12">
                             {stats.percentage}%
@@ -227,7 +252,8 @@ const ParticipationTracker: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
-      
+
+      {/* Summary */}
       <Card>
         <CardHeader>
           <CardTitle>Participation Summary</CardTitle>
@@ -237,27 +263,25 @@ const ParticipationTracker: React.FC = () => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium mb-2">Below Quota</h3>
               <div className="text-3xl font-bold">
-                {sortedTeachers.filter(t => calculateStats(t).status === 'under').length}
+                {sorted.filter((t) => calculateStats(t).status === 'under').length}
               </div>
               <p className="text-sm text-muted-foreground">
                 Teachers needing more participation
               </p>
             </div>
-            
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium mb-2">Met Quota</h3>
               <div className="text-3xl font-bold">
-                {sortedTeachers.filter(t => calculateStats(t).status === 'met').length}
+                {sorted.filter((t) => calculateStats(t).status === 'met').length}
               </div>
               <p className="text-sm text-muted-foreground">
                 Teachers with exact participation
               </p>
             </div>
-            
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium mb-2">Exceeded Quota</h3>
               <div className="text-3xl font-bold">
-                {sortedTeachers.filter(t => calculateStats(t).status === 'over').length}
+                {sorted.filter((t) => calculateStats(t).status === 'over').length}
               </div>
               <p className="text-sm text-muted-foreground">
                 Teachers with extra participation

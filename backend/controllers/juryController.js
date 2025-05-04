@@ -8,22 +8,39 @@ const { validationResult } = require('express-validator');
 // @desc    Get all juries
 // @route   GET /api/juries
 // @access  Private
+
+
+
 exports.getJuries = async (req, res, next) => {
   try {
     let query = Jury.find();
 
-    // Populate with related data
-    query = query
-      .populate('pfeTopicId')
-      .populate('supervisorId', 'firstName lastName')
-      .populate('presidentId', 'firstName lastName')
-      .populate('reporterId', 'firstName lastName');
-
+    // Conditional population based on query parameter
+    if (!req.query.forParticipation) {
+      query = query
+        .populate('pfeTopicId')
+        .populate('supervisorId', 'firstName lastName')
+        .populate('presidentId', 'firstName lastName')
+        .populate('reporterId', 'firstName lastName');
+    } else {
+      query = query.populate('pfeTopicId', 'department'); // Only populate necessary fields
+    }
     // Filter by department (from PFE topic)
-    if (req.query.department) {
-      const topics = await PFETopic.find({ department: req.query.department }).select('_id');
+if (req.query.department && req.query.department != "all")  {
+      department = await Department.findById(req.query.department);
+      if (!department) {
+        return res.status(404).json({
+          success: false,
+          error: 'Department not found'
+        });
+      }
+      const topics = await PFETopic.find({ department: department.name });
+      console.log("topics in getJuries:",topics.length)
       const topicIds = topics.map(topic => topic._id);
       query = query.find({ pfeTopicId: { $in: topicIds } });
+
+    } else{
+      console.log("else in getJuries ")
     }
 
     // Filter by teacher
@@ -57,7 +74,7 @@ exports.getJuries = async (req, res, next) => {
     }
 
     const juries = await query.sort({ date: 1, startTime: 1 });
-
+    console.log("juries.length" ,juries.length);
     res.status(200).json({
       success: true,
       count: juries.length,

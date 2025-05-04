@@ -2,21 +2,13 @@ const PFETopic = require('../models/PFETopic');
 const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
 const Jury = require('../models/Jury');
-const TimeSlot = require('../models/TimeSlot');
 const Department = require('../models/Department');
 
-// @desc    Auto-generate juries
-// @route   POST /api/juries/auto-generate
-// @access  Private (Admin, Department Head)
+// Controller: auto-generate juries without complex scoring
 exports.autoGenerateJuries = async (req, res, next) => {
+  
   try {
-    console.log("[autoGenerateJuries] Invoked");
-
-    // Get department ID from request
     const departmentId = req.body.department || req.user.department;
-    console.log("[autoGenerateJuries] Department ID:", departmentId);
-
-    // Get full department document
     const department = await Department.findById(departmentId);
     if (!department) {
       return res.status(400).json({
@@ -37,11 +29,7 @@ exports.autoGenerateJuries = async (req, res, next) => {
     console.log("[autoGenerateJuries] Pending topics found:", pendingTopics.length);
     
     if (pendingTopics.length === 0) {
-      console.log("[autoGenerateJuries] No pending topics, returning 400");
-      return res.status(400).json({
-        success: false,
-        error: 'No pending topics found for this department'
-      });
+      return res.status(400).json({ success: false, error: 'No pending topics' });
     }
     
     const results = {
@@ -62,27 +50,18 @@ exports.autoGenerateJuries = async (req, res, next) => {
     const defaultTimeSlots = [];
     for (let day = 0; day < daysNeeded; day++) { 
       const date = new Date();
-      date.setDate(date.getDate() + day + 1); // Starting tomorrow
-      date.setHours(0, 0, 0, 0);
-      
-      // Skip weekends
-      if (date.getDay() === 0 || date.getDay() === 6) continue; 
-      
-      for (let hour = 8; hour < 18; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
-          if (hour === 17 && minute === 30) continue; // Skip 5:30 PM
-          
-          const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-          const endHour = minute === 30 ? hour + 1 : hour;
-          const endMinute = minute === 30 ? 0 : 30;
-          const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-          
-          defaultTimeSlots.push({
-            date: date.toISOString().split('T')[0],
-            startTime,
-            endTime
-          });
-        }
+      date.setDate(date.getDate() + d);
+      if ([0,6].includes(date.getDay())) continue;
+      const dateStr = date.toISOString().split('T')[0];
+      for (let h = 8; h < 18; h++) {
+        ['00','30'].forEach(min => {
+          if (h === 17 && min === '30') return;
+          const start = `${h.toString().padStart(2,'0')}:${min}`;
+          const end = min === '30'
+            ? `${(h+1).toString().padStart(2,'0')}:00`
+            : `${h.toString().padStart(2,'0')}:30`;
+          defaultTimeSlots.push({ date: dateStr, startTime: start, endTime: end });
+        });
       }
     }
     console.log("[autoGenerateJuries] Generated time slots:", defaultTimeSlots.length);
@@ -431,7 +410,7 @@ exports.autoGenerateJuries = async (req, res, next) => {
       } catch (err) {
         console.error("[autoGenerateJuries] Error scheduling topic", topic.topicName, err);
         results.failed++;
-        results.errors.push(`Error scheduling topic ${topic.topicName}: ${err.message}`);
+        results.errors.push(`Could not schedule ${topic.topicName}`);
       }
     }
     
@@ -477,7 +456,6 @@ Object.values(teacherRoleCounts).forEach(({ teacher, supervisedCount, reporter, 
       data: results
     });
   } catch (err) {
-    console.error("[autoGenerateJuries] Unhandled error:", err);
     next(err);
   }
 };
