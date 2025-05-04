@@ -142,7 +142,6 @@ exports.updateTeacher = async (req, res, next) => {
 
 // @desc    Delete teacher
 // @route   DELETE /api/teachers/:id
-// @access  Private (Admin)
 exports.deleteTeacher = async (req, res, next) => {
   try {
     const teacher = await Teacher.findById(req.params.id);

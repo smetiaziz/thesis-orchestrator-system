@@ -43,7 +43,7 @@ router
     updateTeacher
   )
   .delete(
-    authorize('admin'),
+    authorize('admin', 'departmentHead'),
     deleteTeacher
   );
 

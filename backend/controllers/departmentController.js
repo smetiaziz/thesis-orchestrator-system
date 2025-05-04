@@ -5,7 +5,6 @@ const { validationResult } = require('express-validator');
 
 // @desc    Get all departments
 // @route   GET /api/departments
-// @access  Private
 exports.getDepartments = async (req, res, next) => {
   try {
     const departments = await Department.find().populate('headId', 'firstName lastName email');
@@ -22,7 +21,6 @@ exports.getDepartments = async (req, res, next) => {
 
 // @desc    Get single department
 // @route   GET /api/departments/:id
-// @access  Private
 exports.getDepartment = async (req, res, next) => {
   try {
     const department = await Department.findById(req.params.id).populate('headId', 'firstName lastName email');
@@ -196,7 +194,6 @@ exports.deleteDepartment = async (req, res, next) => {
 
 // @desc    Create a department head account
 // @route   POST /api/departments/create-head
-// @access  Private (Admin)
 exports.createDepartmentHead = async (req, res, next) => {
   try {
     const errors = validationResult(req);

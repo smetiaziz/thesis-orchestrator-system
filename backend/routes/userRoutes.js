@@ -9,7 +9,7 @@ const router = express.Router();
 // Apply protection to all routes
 router.use(protect);
 // Restrict access to admin only
-router.use(authorize('admin'));
+router.use(authorize('admin', 'departmentHead'));
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -127,7 +127,6 @@ router.put('/:id', async (req, res, next) => {
 
 // @desc    Delete user
 // @route   DELETE /api/users/:id
-// @access  Private (Admin)
 router.delete('/:id', async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
