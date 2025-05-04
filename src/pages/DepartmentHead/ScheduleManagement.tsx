@@ -259,7 +259,6 @@ const ScheduleManagement: React.FC = () => {
                     </div>
                     
                     <div className="mt-3">
-                      <span className="text-sm font-medium">Assign Classroom:</span>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {classrooms.map(classroom => (
                           <Button

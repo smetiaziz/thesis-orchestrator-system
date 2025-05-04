@@ -1,6 +1,7 @@
 const Teacher = require('../models/Teacher');
 const User = require('../models/User');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { readExcelFile, cleanUp } = require('../utils/fileUtils');
 const { sendWelcomeEmail } = require('../utils/emailUtils');
 
@@ -8,6 +9,10 @@ const { sendWelcomeEmail } = require('../utils/emailUtils');
 // @route   POST /api/import/teachers
 // @access  Private (Admin, Department Head)
 exports.importTeachers = async (req, res, next) => {
+  // Start a session for transaction support
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -31,20 +36,21 @@ exports.importTeachers = async (req, res, next) => {
       }
     });
     if (validationErrors.length) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, error: 'Validation errors', details: validationErrors });
     }
 
     // Check for duplicate emails in file
-    const seen = new Set();
-    const dupErrors = [];
-    data.forEach((row, idx) => {
-      if (seen.has(row.email)) {
-        dupErrors.push(`Row ${idx + 1}: duplicate email ${row.email}`);
-      } else {
-        seen.add(row.email);
-      }
-    });
-    if (dupErrors.length) {
+    const emails = data.map(row => row.email.toLowerCase().trim());
+    const uniqueEmails = new Set(emails);
+    if (uniqueEmails.size !== emails.length) {
+      const dupEmails = emails.filter((email, index) => emails.indexOf(email) !== index);
+      const dupErrors = dupEmails.map(email => 
+        `Duplicate email ${email} found in rows ${emails.reduce((acc, e, i) => e === email ? [...acc, i + 1] : acc, []).join(', ')}`
+      );
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, error: 'Duplicate emails found', details: dupErrors });
     }
 
@@ -56,34 +62,85 @@ exports.importTeachers = async (req, res, next) => {
       failedRows: []
     };
 
-    // Process each row sequentially
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      try {
-        // Find or create user
-        let user = await User.findOne({ email: row.email });
-        let newAccount = false;
-        let password = '';
+    // Batch process: first get all existing users and teachers by email
+    const existingUsers = await User.find({ email: { $in: emails } }).lean().session(session);
+    const existingTeachers = await Teacher.find({ email: { $in: emails } }).lean().session(session);
     
-        if (!user) {
-          password = 'password';
-          user = new User({ ...row, role: 'teacher', password });
-          await user.save();
-          newAccount = true;
-        } else {
-          // Reset password for existing user
-          user.role = 'teacher';
-          user.department = row.department;
-          user.password = 'password'; // Set password to 'password'
-          await user.save();
-        }
+    // Create maps for quick lookups (normalize email keys to lowercase)
+    const userMap = existingUsers.reduce((map, user) => {
+      map[user.email.toLowerCase().trim()] = user;
+      return map;
+    }, {});
+    
+    const teacherMap = existingTeachers.reduce((map, teacher) => {
+      map[teacher.email.toLowerCase().trim()] = teacher;
+      return map;
+    }, {});
 
-        // Find or update teacher
+    // Arrays to store new users/teachers and updates
+    const newUsers = [];
+    const newTeachers = [];
+    const userUpdates = [];
+    const teacherUpdates = [];
+    const emailQueue = [];
+
+    // Process data and prepare operations
+    for (let i = 0; i < data.length; i++) {
+      try {
+        const row = data[i];
+        const email = row.email.toLowerCase().trim();
+        
+        // Generate a secure random password for new accounts
+        //const password = crypto.randomBytes(4).toString('hex');
+        const password = 'password';
+        // Handle user creation/update
+        const existingUser = userMap[email];
+        let userId;
+        
+        if (existingUser) {
+          // Update existing user
+          userId = existingUser._id;
+          userUpdates.push({
+            updateOne: {
+              filter: { _id: existingUser._id },
+              update: { 
+                $set: { 
+                  role: 'teacher', 
+                  department: row.department 
+                } 
+              }
+            }
+          });
+        } else {
+          // Create new user
+          const newUser = new User({
+            email: email,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            role: 'teacher',
+            department: row.department,
+            password: password
+          });
+          
+          // Add to list of users to save
+          newUsers.push(newUser);
+          userId = newUser._id;
+          
+          // Queue welcome email
+          emailQueue.push({
+            email: email,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            password
+          });
+        }
+        
+        // Handle teacher creation/update
         const teacherData = {
-          userId: user._id,
+          userId: userId,
           firstName: row.firstName,
           lastName: row.lastName,
-          email: row.email,
+          email: email,
           department: row.department,
           rank: row.rank,
           course: row.course ?? 0,
@@ -92,36 +149,95 @@ exports.importTeachers = async (req, res, next) => {
           coefficient: row.coefficient ?? 1,
           numSupervisionSessions: row.numSupervisionSessions ?? 0
         };
-
-        let teacher = await Teacher.findOne({ email: row.email });
-        if (teacher) {
-          await Teacher.findByIdAndUpdate(teacher._id, teacherData);
+        
+        const existingTeacher = teacherMap[email];
+        if (existingTeacher) {
+          teacherUpdates.push({
+            updateOne: {
+              filter: { _id: existingTeacher._id },
+              update: { $set: teacherData }
+            }
+          });
         } else {
-          teacher = new Teacher(teacherData);
-          await teacher.save();
+          const newTeacher = new Teacher(teacherData);
+          newTeachers.push(newTeacher);
         }
-
-        // Send welcome email for new accounts
-        if (newAccount) {
-          const sent = await sendWelcomeEmail(row.email, row.firstName, row.lastName, password);
-          if (sent) importResults.emailsSent++;
-        }
-
+        
         importResults.imported++;
       } catch (errRow) {
         const message = errRow.message || 'Unknown error';
         importResults.errors.push(`Row ${i + 1}: ${message}`);
-        importResults.failedRows.push({ rowNumber: i + 1, rowData: row, error: message });
+        importResults.failedRows.push({ rowNumber: i + 1, rowData: data[i], error: message });
       }
+    }
+
+    // Execute operations
+    // Save new users first to ensure they exist before creating teachers
+    if (newUsers.length > 0) {
+      const savedUsers = await User.insertMany(newUsers, { session });
+      console.log(`${savedUsers.length} new users created`);
+    }
+    
+    // Process user updates
+    if (userUpdates.length > 0) {
+      const userUpdateResult = await User.bulkWrite(userUpdates, { session });
+      console.log(`${userUpdateResult.modifiedCount} users updated`);
+    }
+    
+    // Save new teachers
+    if (newTeachers.length > 0) {
+      const savedTeachers = await Teacher.insertMany(newTeachers, { session });
+      console.log(`${savedTeachers.length} new teachers created`);
+    }
+    
+    // Process teacher updates
+    if (teacherUpdates.length > 0) {
+      const teacherUpdateResult = await Teacher.bulkWrite(teacherUpdates, { session });
+      console.log(`${teacherUpdateResult.modifiedCount} teachers updated`);
+    }
+    
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+    
+    // Send welcome emails in parallel (outside transaction)
+    if (emailQueue.length > 0) {
+      const emailPromises = emailQueue.map(({ email, firstName, lastName, password }) => 
+        sendWelcomeEmail(email, firstName, lastName, password)
+      );
+      
+      const emailResults = await Promise.allSettled(emailPromises);
+      importResults.emailsSent = emailResults.filter(result => result.status === 'fulfilled' && result.value).length;
     }
 
     // Clean up file
     cleanUp(req.file.path);
 
     // Respond with detailed results
-    return res.status(200).json({ success: true, data: importResults });
+    return res.status(200).json({ 
+      success: true, 
+      data: {
+        ...importResults,
+        newUsers: newUsers.length,
+        updatedUsers: userUpdates.length,
+        newTeachers: newTeachers.length,
+        updatedTeachers: teacherUpdates.length
+      }
+    });
   } catch (error) {
+    console.error('Import teachers error:', error);
+    
+    // Abort transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    
     if (req.file) cleanUp(req.file.path);
-    next(error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Teacher import failed',
+      message: error.message || 'An unknown error occurred',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
