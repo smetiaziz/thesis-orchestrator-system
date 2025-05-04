@@ -1,146 +1,125 @@
-
 const Teacher = require('../models/Teacher');
 const User = require('../models/User');
 const crypto = require('crypto');
-const mongoose = require('mongoose');
 const { readExcelFile, cleanUp } = require('../utils/fileUtils');
 const { sendWelcomeEmail } = require('../utils/emailUtils');
 
-// @desc    Import teachers from Excel
+// @desc    Import Teachers from Excel file
 // @route   POST /api/import/teachers
 // @access  Private (Admin, Department Head)
 exports.importTeachers = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No file uploaded'
-      });
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    const data = readExcelFile(req.file.path);
-    
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Please provide valid teachers data'
-      });
+    const data = await readExcelFile(req.file.path);
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please provide valid teachers data' });
     }
 
     // Validate required columns
     const requiredColumns = ['firstName', 'lastName', 'email', 'department', 'rank'];
-    const firstRow = data[0];
-    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-    
-    if (missingColumns.length) {
-      return res.status(400).json({
-        success: false,
-        error: `Missing required columns: ${missingColumns.join(', ')}`
-      });
+    const validationErrors = [];
+    data.forEach((row, idx) => {
+      const missing = requiredColumns.filter(col => !(col in row));
+      if (missing.length) {
+        validationErrors.push(`Row ${idx + 1}: missing columns – ${missing.join(', ')}`);
+      }
+      if (!row.email) {
+        validationErrors.push(`Row ${idx + 1}: email is required`);
+      }
+    });
+    if (validationErrors.length) {
+      return res.status(400).json({ success: false, error: 'Validation errors', details: validationErrors });
     }
 
-    // Process data
+    // Check for duplicate emails in file
+    const seen = new Set();
+    const dupErrors = [];
+    data.forEach((row, idx) => {
+      if (seen.has(row.email)) {
+        dupErrors.push(`Row ${idx + 1}: duplicate email ${row.email}`);
+      } else {
+        seen.add(row.email);
+      }
+    });
+    if (dupErrors.length) {
+      return res.status(400).json({ success: false, error: 'Duplicate emails found', details: dupErrors });
+    }
+
     const importResults = {
       total: data.length,
       imported: 0,
       errors: [],
-      emailsSent: 0
+      emailsSent: 0,
+      failedRows: []
     };
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      for (const row of data) {
-        // Check if user already exists with this email
+    // Process each row sequentially
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      try {
+        // Find or create user
         let user = await User.findOne({ email: row.email });
         let newAccount = false;
-        let password = "";
-        
+        let password = '';
+
         if (!user) {
-          // Generate a random password
-          password = 'password';
-          
-          // Create new user with teacher role
-          user = await User.create([{
-            firstName: row.firstName,
-            lastName: row.lastName,
-            email: row.email,
-            role: 'teacher',
-            department: row.department,
-            password: password
-          }], { session });
-          
-          user = user[0]; // Extract the user from the array
+          password = crypto.randomBytes(8).toString('hex');
+          user = new User({ ...row, role: 'teacher', password });
+          await user.save();
           newAccount = true;
-        }
-
-        // Check if teacher record already exists
-        let teacher = await Teacher.findOne({ email: row.email });
-        
-        if (teacher) {
-          // Update existing teacher
-          await Teacher.findByIdAndUpdate(teacher._id, {
-            userId: user._id,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            department: row.department,
-            rank: row.rank,
-            course: row.course || 0,
-            td: row.td || 0,
-            tp: row.tp || 0,
-            coefficient: row.coefficient || 1,
-            numSupervisionSessions: row.numSupervisionSessions || 0
-          }, { session });
         } else {
-          // Create new teacher
-          await Teacher.create([{
-            userId: user._id,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            email: row.email,
-            department: row.department,
-            rank: row.rank,
-            course: row.course || 0,
-            td: row.td || 0,
-            tp: row.tp || 0,
-            coefficient: row.coefficient || 1,
-            numSupervisionSessions: row.numSupervisionSessions || 0
-          }], { session });
+          user.role = 'teacher';
+          user.department = row.department;
+          await user.save();
         }
 
-        // Send welcome email to newly created accounts
+        // Find or update teacher
+        const teacherData = {
+          userId: user._id,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          email: row.email,
+          department: row.department,
+          rank: row.rank,
+          course: row.course ?? 0,
+          td: row.td ?? 0,
+          tp: row.tp ?? 0,
+          coefficient: row.coefficient ?? 1,
+          numSupervisionSessions: row.numSupervisionSessions ?? 0
+        };
+
+        let teacher = await Teacher.findOne({ email: row.email });
+        if (teacher) {
+          await Teacher.findByIdAndUpdate(teacher._id, teacherData);
+        } else {
+          teacher = new Teacher(teacherData);
+          await teacher.save();
+        }
+
+        // Send welcome email for new accounts
         if (newAccount) {
-          const emailSent = await sendWelcomeEmail(row.email, row.firstName, row.lastName, password);
-          if (emailSent) {
-            importResults.emailsSent++;
-          }
+          const sent = await sendWelcomeEmail(row.email, row.firstName, row.lastName, password);
+          if (sent) importResults.emailsSent++;
         }
 
         importResults.imported++;
+      } catch (errRow) {
+        const message = errRow.message || 'Unknown error';
+        importResults.errors.push(`Row ${i + 1}: ${message}`);
+        importResults.failedRows.push({ rowNumber: i + 1, rowData: row, error: message });
       }
-
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
     }
 
-    // Clean up the uploaded file
+    // Clean up file
     cleanUp(req.file.path);
 
-    res.status(200).json({
-      success: true,
-      data: importResults
-    });
+    // Respond with detailed results
+    return res.status(200).json({ success: true, data: importResults });
   } catch (error) {
-    // Clean up the uploaded file
-    if (req.file) {
-      cleanUp(req.file.path);
-    }
-    
+    if (req.file) cleanUp(req.file.path);
     next(error);
   }
 };
