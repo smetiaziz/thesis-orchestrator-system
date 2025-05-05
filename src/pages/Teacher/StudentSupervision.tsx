@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { studentsApi } from "@/api/students";
-import { Student } from "@/types";
-import { toast } from "react-hot-toast";
+import { toast } from "@/hooks/use-toast";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -90,12 +90,19 @@ const StudentSupervision: React.FC = () => {
       };
       
       await studentsApi.create(studentData);
-      toast.success('Student added successfully');
+      toast({
+        title: "Success",
+        description: "Student added successfully"
+      });
       resetForm();
       await refetchStudents();
     } catch (error) {
       console.error('Error adding student:', error);
-      toast.error('Failed to add student');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add student"
+      });
     } finally {
       setSubmitting(false);
     }
