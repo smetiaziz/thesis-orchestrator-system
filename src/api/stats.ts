@@ -44,6 +44,29 @@ export interface ParticipationReport {
   status: 'Under Quota' | 'Met Quota' | 'Exceeded Quota';
 }
 
+export interface TeacherStats {
+  supervisedCount: number;
+  juryCount: number;
+  upcomingJuries: Array<{
+    _id: string;
+    pfeTopicId: {
+      topicName: string;
+      studentName: string;
+    };
+    date: string;
+    startTime: string;
+    location: string;
+  }>;
+}
+
+export interface SupervisionStats {
+  studentCount: number;
+}
+
+export interface AvailabilityStats {
+  availabilityCount: number;
+}
+
 export const statsApi = {
   getDepartmentStats: (department: string) => 
     api.get<ApiResponse<DepartmentStats>>(`/stats/department/${encodeURIComponent(department)}`),
@@ -53,4 +76,14 @@ export const statsApi = {
     
   getParticipationReport: (params?: { department?: string }) => 
     api.get<ApiResponse<ParticipationReport[]>>('/stats/reports/participation', params),
+    
+  // New endpoints for teacher dashboard
+  getTeacherStats: () => 
+    api.get<ApiResponse<TeacherStats>>('/stats/teacher'),
+    
+  getSupervisionStats: () => 
+    api.get<ApiResponse<SupervisionStats>>('/students/supervised'),
+    
+  getAvailabilityStats: () => 
+    api.get<ApiResponse<AvailabilityStats>>('/timeslots/my'),
 };

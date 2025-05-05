@@ -1,70 +1,39 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, FileText, ClipboardList, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-
-interface TeacherStatsResponse {
-  success: boolean;
-  data: {
-    supervisedCount: number;
-    juryCount: number;
-    upcomingJuries: UpcomingJury[];
-  }
-}
-
-interface UpcomingJury {
-  _id: string;
-  pfeTopicId: {
-    topicName: string;
-    studentName: string;
-  };
-  date: string;
-  startTime: string;
-  location: string;
-}
-
-interface StudentsResponse {
-  success: boolean;
-  count: number;
-  data: any[];
-}
-
-interface AvailabilityResponse {
-  success: boolean;
-  count: number;
-  data: any[];
-}
+import { statsApi } from "@/api/stats";
+import { format } from "date-fns";
 
 const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
   
   // Fetch teacher data including supervision and jury counts
-  const { data: teacherData, isLoading: teacherLoading } = useQuery<TeacherStatsResponse>({
+  const { data: teacherData, isLoading: teacherLoading } = useQuery({
     queryKey: ['teacher-stats'],
     queryFn: async () => {
-      return api.get<TeacherStatsResponse>('/stats/teacher');
+      return statsApi.getTeacherStats();
     }
   });
   
   // Fetch supervised students count
-  const { data: studentsData, isLoading: studentsLoading } = useQuery<StudentsResponse>({
+  const { data: studentsData, isLoading: studentsLoading } = useQuery({
     queryKey: ['supervised-students-count'],
     queryFn: async () => {
-      return api.get<StudentsResponse>('/students/supervised');
+      return statsApi.getSupervisionStats();
     }
   });
   
   // Fetch available time slots count
-  const { data: availabilityData, isLoading: availabilityLoading } = useQuery<AvailabilityResponse>({
+  const { data: availabilityData, isLoading: availabilityLoading } = useQuery({
     queryKey: ['availability-count'],
     queryFn: async () => {
-      return api.get<AvailabilityResponse>('/timeslots/my');
+      return statsApi.getAvailabilityStats();
     }
   });
   
@@ -76,8 +45,8 @@ const TeacherDashboard: React.FC = () => {
   
   const supervisedCount = stats.supervisedCount;
   const juryCount = stats.juryCount;
-  const studentCount = studentsData?.count || 0;
-  const availabilityCount = availabilityData?.count || 0;
+  const studentCount = studentsData?.data?.studentCount || 0;
+  const availabilityCount = availabilityData?.data?.availabilityCount || 0;
   
   return (
     <div className="py-6 space-y-6">
@@ -216,7 +185,7 @@ const TeacherDashboard: React.FC = () => {
                     <div>
                       <h4 className="font-medium">{jury.pfeTopicId.topicName}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {jury.pfeTopicId.studentName} - {new Date(jury.date).toLocaleDateString()} at {jury.startTime}
+                        {jury.pfeTopicId.studentName} - {format(new Date(jury.date), 'PPP')} at {jury.startTime}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {jury.location}
