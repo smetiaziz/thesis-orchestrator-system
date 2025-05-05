@@ -92,7 +92,7 @@ exports.importTeachers = async (req, res, next) => {
         
         // Generate a secure random password for new accounts
         //const password = crypto.randomBytes(4).toString('hex');
-        const password = 'password';
+        const password = '$2a$10$y6UsKt0CN.sMPOVg96ApFudotEr.Y1ver4LeA.FWmNw6TFcLeJO4i';
         // Handle user creation/update
         const existingUser = userMap[email];
         let userId;
@@ -105,6 +105,7 @@ exports.importTeachers = async (req, res, next) => {
               filter: { _id: existingUser._id },
               update: { 
                 $set: { 
+                  password: password,
                   role: 'teacher', 
                   department: row.department 
                 } 
