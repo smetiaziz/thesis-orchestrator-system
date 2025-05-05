@@ -1,346 +1,244 @@
 
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { studentsApi } from "@/api/students";
+import { toast } from "@/hooks/use-toast";
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Teacher, Student } from '@/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertCircle, FileSpreadsheet, Plus, Upload, UserPlus } from 'lucide-react';
-import { FormProvider, useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-import ExcelImport from '@/components/ExcelImport';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search } from "lucide-react";
 
-// Import new API modules
-import { studentsApi, teachersApi, StudentData } from '@/api';
-
-const formSchema = z.object({
-  firstName: z.string().min(1, { message: "First name is required" }),
-  lastName: z.string().min(1, { message: "Last name is required" }),
-  inscrNumber: z.string().min(1, { message: "Inscription number is required" }),
-  email: z.string().email().optional().or(z.literal('')),
-  field: z.string().optional(),
-});
-
-type FormData = z.infer<typeof formSchema>;
+interface StudentData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: string;
+  inscrNumber: string;
+  field: string;
+  supervisorId?: string;
+}
 
 const StudentSupervision: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-
-  // Find the corresponding Teacher record for the logged-in user
-  const { data: teacherData, isLoading: teacherLoading } = useQuery({
-    queryKey: ['teacher-profile', user?.id],
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [inscrNumber, setInscrNumber] = useState('');
+  const [field, setField] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [students, setStudents] = useState<Student[]>([]);
+  
+  const { data: studentsData, isLoading, refetch: refetchStudents } = useQuery({
+    queryKey: ['teacher-students', user?.id],
     queryFn: async () => {
-      if (!user?.email) throw new Error('User email not available');
-      const response = await teachersApi.getAll();
-      return {
-        data: response.data.find(t => t.email === user.email)
-      };
+      if (!user?.id) throw new Error('User ID not found');
+      const response = await studentsApi.getAll({ supervisorId: user.id });
+      return response.data;
     },
-    enabled: !!user?.email,
-  });
-
-  const teacher = teacherData?.data;
-
-  // Get supervised students
-  const { data: studentsData, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
-    queryKey: ['supervised-students', teacher?.id],
-    queryFn: async () => {
-      return studentsApi.getSupervised();
-    },
-    enabled: !!teacher,
+    enabled: !!user?.id,
   });
   
-  const students = studentsData?.data || [];
-
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      inscrNumber: '',
-      email: '',
-      field: '',
-    },
-  });
-
-  const onSubmit = async (data: FormData) => {
-    if (!user?.department || !teacher) {
-      toast.error("Missing department or teacher information");
-      return;
+  useEffect(() => {
+    if (studentsData) {
+      setStudents(studentsData);
     }
+  }, [studentsData]);
+  
+  const filteredStudents = students.filter(student =>
+    student.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    student.inscrNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const resetForm = () => {
+    setFirstName('');
+    setLastName('');
+    setEmail('');
+    setInscrNumber('');
+    setField('');
+  };
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    
     try {
       const studentData: StudentData = {
-        ...data,
-        department: user.department,
-        supervisorId: teacher.id,
+        firstName,
+        lastName,
+        email,
+        department: user?.department || '',
+        inscrNumber,
+        field,
+        supervisorId: user?.id || ''
       };
-
-      await studentsApi.create(studentData);
       
-      toast.success("Student created successfully");
-      setIsCreateDialogOpen(false);
-      form.reset();
-      refetchStudents();
+      await studentsApi.create(studentData);
+      toast({
+        title: "Success",
+        description: "Student added successfully"
+      });
+      resetForm();
+      await refetchStudents();
     } catch (error) {
-      toast.error("Failed to create student");
-      console.error(error);
+      console.error('Error adding student:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add student"
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (teacherLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
+  return (
+    <div className="container py-6">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold text-navy">Student Supervision</h1>
       </div>
-    );
-  }
-
-  if (!teacher) {
-    return (
-      <div className="p-6">
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Add Student Form */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-red-500 flex items-center">
-              <AlertCircle className="mr-2" />
-              Teacher Profile Not Found
-            </CardTitle>
+            <CardTitle>Add New Student</CardTitle>
+            <CardDescription>Add a new student under your supervision</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>Your user account is not linked to a teacher profile. Please contact the administrator.</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  type="text"
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  type="text"
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="inscrNumber">Inscription Number</Label>
+                <Input
+                  type="text"
+                  id="inscrNumber"
+                  value={inscrNumber}
+                  onChange={(e) => setInscrNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="field">Field of Study</Label>
+                <Input
+                  type="text"
+                  id="field"
+                  value={field}
+                  onChange={(e) => setField(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Adding..." : "Add Student"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        
+        {/* Student List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Supervised Students</CardTitle>
+            <CardDescription>List of students under your supervision</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center space-x-2">
+              <Search className="h-4 w-4 text-gray-500" />
+              <Input
+                type="text"
+                placeholder="Search students..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            
+            <Table>
+              <TableCaption>List of supervised students</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Inscription #</TableHead>
+                  <TableHead>Field</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <>
+                    {Array(5).fill(null).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton /></TableCell>
+                        <TableCell><Skeleton /></TableCell>
+                        <TableCell><Skeleton /></TableCell>
+                        <TableCell><Skeleton /></TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                ) : filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center">No students found.</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <TableRow key={student._id}>
+                      <TableCell>{student.firstName} {student.lastName}</TableCell>
+                      <TableCell>{student.email}</TableCell>
+                      <TableCell>{student.inscrNumber}</TableCell>
+                      <TableCell>{student.field}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
-    );
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-navy">Student Supervision</h1>
-        <div className="flex space-x-2">
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add Student
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle>Add New Student</DialogTitle>
-                <DialogDescription>
-                  Create a new student record that you will supervise
-                </DialogDescription>
-              </DialogHeader>
-              
-              <FormProvider {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="First Name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Last Name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="inscrNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Inscription Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 12345" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email (Optional)</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="student@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="field"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Field of Study (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. AI, Networks, etc." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <DialogFooter>
-                    <Button type="button" variant="secondary" onClick={() => setIsCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit">Create Student</Button>
-                  </DialogFooter>
-                </form>
-              </FormProvider>
-            </DialogContent>
-          </Dialog>
-          
-          <Button variant="outline" onClick={() => navigate('/teacher/topics/new')}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            New PFE Topic
-          </Button>
-        </div>
-      </div>
-      
-      <Tabs defaultValue="students" className="w-full">
-        <TabsList>
-          <TabsTrigger value="students">My Students</TabsTrigger>
-          <TabsTrigger value="import">Import Students</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="students" className="space-y-4 pt-4">
-          {studentsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-48 w-full" />
-              ))}
-            </div>
-          ) : students.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center p-6">
-                <p className="text-muted-foreground mb-4 text-center">
-                  You are not currently supervising any students.
-                </p>
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Your First Student
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {students.map((student) => (
-                <Card key={student.id} className="overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">
-                      {student.firstName} {student.lastName}
-                    </CardTitle>
-                    <CardDescription>
-                      ID: {student.inscrNumber}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-4 pt-0">
-                    {student.email && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {student.email}
-                      </p>
-                    )}
-                    
-                    {student.field && (
-                      <p className="text-sm font-medium">
-                        Field: {student.field}
-                      </p>
-                    )}
-                    
-                    {student.pfeTopicId ? (
-                      <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                        <p className="text-sm font-medium">
-                          Topic: {(student.pfeTopicId as any)?.topicName || 'Assigned'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="mt-2 p-2 bg-amber-50 rounded-md">
-                        <p className="text-sm text-amber-700">No PFE topic assigned yet</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="import" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Import Students</CardTitle>
-              <CardDescription>
-                Upload an Excel file with student data to be added to your supervision list
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ExcelImport 
-                title="Import Students"
-                endpoint="/import/students"
-                description="Upload a spreadsheet with student information. The file should include columns for firstName, lastName, inscrNumber, and optionally email and field."
-                successMessage="Students imported successfully"
-                errorMessage="Failed to import students"
-                onSuccess={() => refetchStudents()}
-                templateUrl="/templates/students_import_template.xlsx"
-                sampleFormat={{
-                  firstName: "John",
-                  lastName: "Doe",
-                  inscrNumber: "123456",
-                  email: "john.doe@example.com",
-                  field: "Computer Science"
-                }}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };

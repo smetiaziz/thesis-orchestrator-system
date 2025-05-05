@@ -7,45 +7,33 @@ import { Calendar, Users, FileText, ClipboardList, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { statsApi } from "@/api/stats";
+import { teachersApi } from "@/api/teachers";
 import { format } from "date-fns";
 
 const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
   
-  // Fetch teacher data including supervision and jury counts
+  // Fetch teacher data including supervision and jury counts using the new endpoint
   const { data: teacherData, isLoading: teacherLoading } = useQuery({
-    queryKey: ['teacher-stats'],
+    queryKey: ['teacher-profile', user?.id],
     queryFn: async () => {
-      return statsApi.getTeacherStats();
-    }
+      if (!user?.id) throw new Error('User ID not found');
+      return teachersApi.getByUserId(user.id);
+    },
+    enabled: !!user?.id
   });
   
-  // Fetch supervised students count
-  const { data: studentsData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['supervised-students-count'],
-    queryFn: async () => {
-      return statsApi.getSupervisionStats();
-    }
-  });
+  const teacher = teacherData?.data;
+  const supervisedProjects = teacher?.supervisedProjects || [];
+  const juryParticipations = teacher?.juryParticipations || [];
   
-  // Fetch available time slots count
-  const { data: availabilityData, isLoading: availabilityLoading } = useQuery({
-    queryKey: ['availability-count'],
-    queryFn: async () => {
-      return statsApi.getAvailabilityStats();
-    }
-  });
-  const stats = teacherData?.data || {
-    supervisedCount: 0,
-    juryCount: 0,
-    upcomingJuries: []
-  };
-  
-  const supervisedCount = stats.supervisedCount;
-  const juryCount = stats.juryCount;
-  const studentCount = studentsData?.data?.studentCount || 0;
-  const availabilityCount = availabilityData?.data?.availabilityCount || 0;
+  // Get upcoming juries - filter jury participations where date is in the future
+  const upcomingJuries = Array.isArray(juryParticipations) ? 
+    juryParticipations
+      .filter((jury: any) => new Date(jury.date) > new Date())
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5) : 
+    [];
   
   return (
     <div className="py-6 space-y-6">
@@ -84,7 +72,7 @@ const TeacherDashboard: React.FC = () => {
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold">{supervisedCount}</div>
+                <div className="text-3xl font-bold">{supervisedProjects.length}</div>
                 <p className="text-sm text-muted-foreground">
                   Topics you are supervising
                 </p>
@@ -105,7 +93,7 @@ const TeacherDashboard: React.FC = () => {
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold">{juryCount}</div>
+                <div className="text-3xl font-bold">{juryParticipations.length}</div>
                 <p className="text-sm text-muted-foreground">
                   Juries you're part of
                 </p>
@@ -122,11 +110,13 @@ const TeacherDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {studentsLoading ? (
+            {teacherLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold">{studentCount}</div>
+                <div className="text-3xl font-bold">
+                  {supervisedProjects.filter((project: any) => project.studentName).length}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Students under supervision
                 </p>
@@ -139,17 +129,19 @@ const TeacherDashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center">
               <Clock className="mr-2 text-navy h-5 w-5" />
-              Time Slots
+              Required Participations
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {availabilityLoading ? (
+            {teacherLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold">{availabilityCount}</div>
+                <div className="text-3xl font-bold">
+                  {supervisedProjects.length * 3}
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Available time slots
+                  Based on supervision count
                 </p>
               </>
             )}
@@ -172,13 +164,13 @@ const TeacherDashboard: React.FC = () => {
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : stats.upcomingJuries.length === 0 ? (
+            ) : upcomingJuries.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No upcoming presentations scheduled
               </div>
             ) : (
               <div className="space-y-4">
-                {stats.upcomingJuries.map((jury) => (
+                {upcomingJuries.map((jury: any) => (
                   <div key={jury._id} className="flex items-start p-3 rounded-lg bg-gray-50 border">
                     <Clock className="h-5 w-5 text-muted-foreground mr-3 mt-0.5" />
                     <div>

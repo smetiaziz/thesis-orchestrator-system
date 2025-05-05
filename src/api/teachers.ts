@@ -23,6 +23,9 @@ export const teachersApi = {
   getById: (id: string) => 
     api.get<ApiResponse<Teacher>>(`/teachers/${id}`),
     
+  getByUserId: (userId: string) => 
+    api.get<ApiResponse<Teacher>>(`/teachers/by-user`, { userId }),
+    
   create: (data: TeacherData) => 
     api.post<ApiResponse<Teacher>>('/teachers', data),
     
@@ -35,6 +38,7 @@ export const teachersApi = {
   importTeachers: (formData: FormData) => {
     // We need to manually create this fetch due to FormData handling
     const token = localStorage.getItem('token');
+    const API_URL = process.env.API_URL || 'http://localhost:5000/api';
     return fetch(`${API_URL}/import/teachers`, {
       method: 'POST',
       headers: {
