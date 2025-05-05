@@ -3,11 +3,26 @@ const Teacher = require('../models/Teacher');
 const Classroom = require('../models/Classroom');
 const Jury = require('../models/Jury');
 const Department = require('../models/Department');
-
+const TimeSlot = require('../models/TimeSlot');
 // Controller: auto-generate juries without complex scoring
 exports.autoGenerateJuries = async (req, res, next) => {
   
   try {
+// 1. Avec le constructeur natif Date :
+let startGenDate = new Date(req.body.startDate);
+
+// 2. (Optionnel) Vérifier que c’est bien une date valide
+if (isNaN(startGenDate.getTime())) {
+  return res.status(400).json({
+    success: false,
+    error: 'Invalid startDate format'
+  });
+}
+
+// 3. Remettre à minuit (facultatif selon votre logique)
+startGenDate.setHours(0, 0, 0, 0);
+
+
     const departmentId = req.body.department || req.user.department;
     const department = await Department.findById(departmentId);
     if (!department) {
@@ -48,18 +63,24 @@ exports.autoGenerateJuries = async (req, res, next) => {
       `(pendingTopics=${pendingTopics.length}, slotsPerDay=${SLOTS_PER_DAY})`
     );
     const defaultTimeSlots = [];
-    for (let day = 0; day < daysNeeded; day++) { 
-      const date = new Date();
-      date.setDate(date.getDate() + d);
-      if ([0,6].includes(date.getDay())) continue;
+    for (let day = 0; day < daysNeeded; day++) {
+      // Create a new date for each day to avoid mutation
+      const date = new Date(startGenDate);
+      date.setDate(date.getDate() + day + 1);
+    
+      // Skip weekends
+      if ([0, 6].includes(date.getDay())) continue;
+    
       const dateStr = date.toISOString().split('T')[0];
+      
+      // Generate time slots for this date
       for (let h = 8; h < 18; h++) {
-        ['00','30'].forEach(min => {
-          if (h === 17 && min === '30') return;
-          const start = `${h.toString().padStart(2,'0')}:${min}`;
-          const end = min === '30'
-            ? `${(h+1).toString().padStart(2,'0')}:00`
-            : `${h.toString().padStart(2,'0')}:30`;
+        ['00', '30'].forEach(min => {
+          if (h === 17 && min === '30') return; // Skip 17:30
+          const start = `${h.toString().padStart(2, '0')}:${min}`;
+          const end = min === '30' 
+            ? `${(h + 1).toString().padStart(2, '0')}:00`
+            : `${h.toString().padStart(2, '0')}:30`;
           defaultTimeSlots.push({ date: dateStr, startTime: start, endTime: end });
         });
       }

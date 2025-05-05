@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { toast } from '@/components/ui/use-toast';
 import { RefreshCw, FileDown, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +33,7 @@ interface Jury {
     topicName: string;
     studentName: string;
   };
+  startTime?: string;
   date?: string;
   location?: string;
   members: string[];
@@ -47,7 +49,6 @@ interface AutoGenerateResponse {
   };
 }
 
-// Enhanced PDF styles
 const styles = StyleSheet.create({
   page: { 
     padding: 30,
@@ -149,9 +150,7 @@ const styles = StyleSheet.create({
   }
 });
 
-// Enhanced PDF Document component
 const SchedulePDF = ({ department, allPresentations }) => {
-  // Group presentations by date
   const presentationsByDate = {};
   
   allPresentations.forEach(pres => {
@@ -161,14 +160,13 @@ const SchedulePDF = ({ department, allPresentations }) => {
     presentationsByDate[pres.date].push(pres);
   });
 
-  // Sort dates
   const sortedDates = Object.keys(presentationsByDate).sort();
 
   return (
     <Document>
       <Page style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.title}>{department} Department</Text>
+          <Text style={styles.title}>Computer Science Department</Text>
           <Text style={styles.subtitle}>Complete Presentation Schedule</Text>
           <Text style={styles.subtitle}>Generated on: {format(new Date(), 'MMMM d, yyyy')}</Text>
         </View>
@@ -189,7 +187,7 @@ const SchedulePDF = ({ department, allPresentations }) => {
                   <Text style={styles.headerCell}>Topic</Text>
                   <Text style={styles.headerCell}>Student</Text>
                   <Text style={styles.headerCell}>Classroom</Text>
-                  <Text style={styles.headerCell}>Jury Members</Text>
+                  <Text style={styles.headerCell}>Time</Text>
                 </View>
                 
                 {presentationsByDate[date].map((pres, index) => (
@@ -200,7 +198,7 @@ const SchedulePDF = ({ department, allPresentations }) => {
                     <Text style={styles.largeCell}>{pres.topic || 'N/A'}</Text>
                     <Text style={styles.cell}>{pres.student || 'N/A'}</Text>
                     <Text style={styles.cell}>{pres.classroom || 'Not assigned'}</Text>
-                    <Text style={styles.cell}>{pres.juryMembers || 'Not assigned'}</Text>
+                    <Text style={styles.cell}>{pres.startTime || 'Not assigned'}</Text>
                   </View>
                 ))}
               </View>
@@ -224,11 +222,12 @@ const SchedulePDF = ({ department, allPresentations }) => {
 const ScheduleManagement: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [autoGenerateStartDate, setAutoGenerateStartDate] = useState<Date | undefined>();
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [exportingAll, setExportingAll] = useState<boolean>(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
 
-  // Query for specific date
   const { data: juriesResponse, isLoading: loadingJuries, refetch: refetchJuries } = useQuery({
     queryKey: ['juries', formattedDate, selectedDepartment],
     queryFn: async () => {
@@ -240,13 +239,12 @@ const ScheduleManagement: React.FC = () => {
     enabled: !!formattedDate && !!selectedDepartment,
   });
 
-  // Query for all dates (for the PDF export)
   const { data: allJuriesResponse, isLoading: loadingAllJuries } = useQuery({
     queryKey: ['all-juries', selectedDepartment],
     queryFn: async () => {
       if (!selectedDepartment) return { data: [] };
       const response = await api.get<{ success: boolean; data: Jury[] }>(
-        `/juries/department/${selectedDepartment}`
+        `/juries`
       );
       return response;
     },
@@ -262,15 +260,20 @@ const ScheduleManagement: React.FC = () => {
   });
 
   const autoGenerateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (variables: { department: string; startDate: Date }) => {
+      const formattedStartDate = format(variables.startDate, 'yyyy-MM-dd');
       const response = await api.post<AutoGenerateResponse>(
         '/juries/auto-generate',
-        { department: selectedDepartment }
+        { 
+          department: variables.department, 
+          startDate: formattedStartDate 
+        }
       );
       return response;
     },
     onSuccess: (response) => {
       const { total, scheduled, failed, errors } = response.data;
+      setIsPopoverOpen(false);
       if (scheduled > 0) {
         toast({
           title: "Schedule Generated",
@@ -304,10 +307,6 @@ const ScheduleManagement: React.FC = () => {
     },
   });
 
-  const handleAutoGenerate = () => {
-    autoGenerateMutation.mutate();
-  };
-
   const handleSetClassroom = async (juryId: string, classroomName: string) => {
     try {
       await api.put(`/juries/${juryId}/classroom`, { classroom: classroomName, date: formattedDate });
@@ -325,7 +324,6 @@ const ScheduleManagement: React.FC = () => {
     }
   };
 
-  // Handle preparation of PDF data
   const handlePrepareExport = () => {
     setExportingAll(true);
   };
@@ -336,7 +334,6 @@ const ScheduleManagement: React.FC = () => {
   const validJuries = juries.filter(jury => jury.pfeTopicId?.topicName && jury.pfeTopicId?.studentName);
   const validAllJuries = allJuries.filter(jury => jury.pfeTopicId?.topicName && jury.pfeTopicId?.studentName);
 
-  // Format data for PDF export (single date)
   const pdfData = {
     department: selectedDepartment,
     allPresentations: validJuries.map(jury => ({
@@ -344,11 +341,10 @@ const ScheduleManagement: React.FC = () => {
       topic: jury.pfeTopicId?.topicName,
       student: jury.pfeTopicId?.studentName,
       classroom: jury.location || 'Not assigned',
-      juryMembers: jury.members?.join(', ') || 'Not assigned'
+      startTime: jury.startTime || 'Not assigned'
     }))
   };
 
-  // Format data for all dates PDF export
   const allPdfData = {
     department: selectedDepartment,
     allPresentations: validAllJuries.map(jury => ({
@@ -356,7 +352,7 @@ const ScheduleManagement: React.FC = () => {
       topic: jury.pfeTopicId?.topicName,
       student: jury.pfeTopicId?.studentName,
       classroom: jury.location || 'Not assigned',
-      juryMembers: jury.members?.join(', ') || 'Not assigned'
+      startTime: jury.startTime || 'Not assigned'
     }))
   };
 
@@ -375,7 +371,6 @@ const ScheduleManagement: React.FC = () => {
           
           {selectedDepartment && (
             <div className="flex gap-2">
-              {/* PDF Export for current date */}
               <PDFDownloadLink
                 document={<SchedulePDF {...pdfData} />}
                 fileName={`schedule-${selectedDepartment}-${formattedDate}.pdf`}
@@ -388,7 +383,6 @@ const ScheduleManagement: React.FC = () => {
                 )}
               </PDFDownloadLink>
               
-              {/* PDF Export for all dates */}
               {exportingAll ? (
                 <PDFDownloadLink
                   document={<SchedulePDF {...allPdfData} />}
@@ -408,14 +402,47 @@ const ScheduleManagement: React.FC = () => {
                 </Button>
               )}
               
-              <Button
-                onClick={handleAutoGenerate}
-                disabled={autoGenerateMutation.isPending || !selectedDepartment}
-                className="gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
-                Auto-Generate Schedule
-              </Button>
+              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    disabled={autoGenerateMutation.isPending || !selectedDepartment}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${autoGenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                    Auto-Generate Schedule
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={autoGenerateStartDate}
+                    onSelect={setAutoGenerateStartDate}
+                    initialFocus
+                  />
+                  <div className="p-3 pt-0 flex justify-center">
+                    <Button
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => {
+                        if (autoGenerateStartDate) {
+                          autoGenerateMutation.mutate(
+                            { 
+                              department: selectedDepartment, 
+                              startDate: autoGenerateStartDate 
+                            },
+                            {
+                              onSuccess: () => setIsPopoverOpen(false)
+                            }
+                          );
+                        }
+                      }}
+                      disabled={!autoGenerateStartDate}
+                    >
+                      Confirm Start Date
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
         </div>
@@ -465,11 +492,9 @@ const ScheduleManagement: React.FC = () => {
                     </div>
                     
                     <div className="mt-2">
-                      <span className="text-sm font-medium">Jury Members:</span>
+                      <span className="text-sm font-medium">Time:</span>
                       <p className="text-sm text-muted-foreground">
-                        {jury.members?.length > 0 
-                          ? jury.members.join(', ') 
-                          : 'No jury members assigned'}
+                        {jury?.startTime} H
                       </p>
                     </div>
                     

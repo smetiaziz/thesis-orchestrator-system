@@ -20,21 +20,26 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const { login, error, isLoading, isAuthenticated } = useAuth();
-  const { toast } = useToast();
+  const { login, error, isLoading, isAuthenticated, user } = useAuth();  const { toast } = useToast();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  const from = state?.from?.pathname || "/dashboard";
 
   useEffect(() => {
     // Redirect if already authenticated
-    if (isAuthenticated) {
-      navigate(from, { replace: true });
-    }
-  }, [isAuthenticated, navigate, from]);
+    if (isAuthenticated && user) {
+           // pick your route based on the user.role
+            const target =
+              user.role === "teacher"
+                ? "/dashboard"
+                : "/department-dashboard";
+      
+            navigate(target, { replace: true });
+          }
+        }, [isAuthenticated, user, navigate]);
 
+        
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await login(email, password);

@@ -24,7 +24,6 @@ const Sidebar: React.FC = () => {
   // Define navigation links based on user role
   const getNavLinks = () => {
     const commonLinks = [
-      { to: "/department-dashboard", icon: <Home className="h-5 w-5" />, text: "Dashboard" },
     ];
 
     const roleSpecificLinks = {
@@ -36,6 +35,7 @@ const Sidebar: React.FC = () => {
         { to: "/settings", icon: <Settings className="h-5 w-5" />, text: "System Settings" },
       ],
       departmentHead: [
+        { to: "/department-dashboard", icon: <Home className="h-5 w-5" />, text: "Dashboard" },
         { to: "/topics", icon: <BookOpen className="h-5 w-5" />, text: "PFE Topics" },
         { to: "/teachers", icon: <School className="h-5 w-5" />, text: "Teachers" },
         { to: "/classrooms", icon: <Building2 className="h-5 w-5" />, text: "Classrooms" },
@@ -45,9 +45,8 @@ const Sidebar: React.FC = () => {
         { to: "/participation", icon: <ClipboardList className="h-5 w-5" />, text: "Participation" },
       ],
       teacher: [
-        { to: "/presentations", icon: <BookOpen className="h-5 w-5" />, text: "My Presentations" },
+        { to: "/dashboard",  icon: <Home className="h-5 w-5" />, text: "Dashboard" },
         { to: "/availability", icon: <Calendar className="h-5 w-5" />, text: "Availability" },
-        { to: "/participation", icon: <ClipboardList className="h-5 w-5" />, text: "Participation" },
       ],
       student: [
         { to: "/my-topic", icon: <BookOpen className="h-5 w-5" />, text: "My Topic" },
