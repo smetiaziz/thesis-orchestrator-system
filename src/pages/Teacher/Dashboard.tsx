@@ -36,7 +36,6 @@ const TeacherDashboard: React.FC = () => {
       return statsApi.getAvailabilityStats();
     }
   });
-  
   const stats = teacherData?.data || {
     supervisedCount: 0,
     juryCount: 0,
