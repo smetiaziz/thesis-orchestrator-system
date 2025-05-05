@@ -6,16 +6,15 @@ import { ApiResponse } from './config';
 export interface StudentData {
   firstName: string;
   lastName: string;
-  inscrNumber: string;
+  email: string;
   department: string;
-  email?: string;
-  field?: string;
+  inscrNumber: string;
+  field: string;
   supervisorId?: string;
-  pfeTopicId?: string;
 }
 
 export const studentsApi = {
-  getAll: (params?: { department?: string; supervisorId?: string; field?: string }) => 
+  getAll: (params?: { department?: string; supervisorId?: string }) => 
     api.get<ApiResponse<Student[]>>('/students', params),
     
   getById: (id: string) => 
@@ -29,12 +28,11 @@ export const studentsApi = {
     
   delete: (id: string) => 
     api.delete<ApiResponse<{}>>(`/students/${id}`),
-    
-  getSupervised: () => 
-    api.get<ApiResponse<Student[]>>('/students/supervised'),
 
   importStudents: (formData: FormData) => {
+    // We need to manually create this fetch due to FormData handling
     const token = localStorage.getItem('token');
+    const API_URL = process.env.API_URL || 'http://localhost:5000/api';
     return fetch(`${API_URL}/import/students`, {
       method: 'POST',
       headers: {

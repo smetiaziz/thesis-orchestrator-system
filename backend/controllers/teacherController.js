@@ -64,6 +64,40 @@ exports.getTeacher = async (req, res, next) => {
   }
 };
 
+// @desc    Get teacher by user ID
+// @route   GET /api/teachers/by-user
+// @access  Private
+exports.getTeacherByUserId = async (req, res, next) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID parameter is required'
+      });
+    }
+
+    const teacher = await Teacher.findOne({ userId })
+      .populate('supervisedProjects')
+      .populate('juryParticipations');
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        error: 'Teacher not found for this user'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: teacher
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Create a new teacher
 // @route   POST /api/teachers
 // @access  Private (Admin, Department Head)

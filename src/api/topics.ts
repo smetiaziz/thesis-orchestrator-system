@@ -5,11 +5,12 @@ import { ApiResponse } from './config';
 
 export interface TopicData {
   topicName: string;
+  topicDescription: string;
   studentName: string;
-  supervisorId: string;
+  email: string;
+  inscrNumber: string;
   department: string;
-  description?: string;
-  keywords?: string[];
+  supervisorId: string;
 }
 
 export const topicsApi = {
@@ -29,7 +30,9 @@ export const topicsApi = {
     api.delete<ApiResponse<{}>>(`/topics/${id}`),
 
   importTopics: (formData: FormData) => {
+    // We need to manually create this fetch due to FormData handling
     const token = localStorage.getItem('token');
+    const API_URL = process.env.API_URL || 'http://localhost:5000/api';
     return fetch(`${API_URL}/import/topics`, {
       method: 'POST',
       headers: {

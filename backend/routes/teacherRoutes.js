@@ -6,7 +6,8 @@ const {
   createTeacher,
   updateTeacher,
   deleteTeacher,
-  importTeachers
+  importTeachers,
+  getTeacherByUserId
 } = require('../controllers/teacherController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { check } = require('express-validator');
@@ -25,6 +26,9 @@ const teacherValidation = [
   check('rank', 'Rank is required').not().isEmpty(),
   check('email', 'Valid email is required').isEmail()
 ];
+
+// Add the new route for getting teacher by user ID
+router.get('/by-user', authorize('admin', 'departmentHead', 'teacher'), getTeacherByUserId);
 
 router
   .route('/')
